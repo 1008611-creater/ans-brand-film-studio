@@ -16,7 +16,8 @@
 | 专属复利 Skill | `.agents/skills/ans-p5-brush-cartoon-animation/`（SKILL.md + scripts/ + references/，12 个文件） | ✅ 已入库 |
 | 交接图文源稿（飞书同一源稿） | `ANS-Day01-P5Brush-Skill-Workflow-Handoff.md` | ✅ 已入库 |
 | 飞书一键导入包（无需装 Python） | `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` | ✅ 已入库 |
-| 飞书在线云文档（V1，含内嵌高清设定图与 5 幕关键帧） | https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb | ✅ 在线 |
+| 飞书在线云文档 **V2（当前版**，含内嵌高清设定图与 5 幕关键帧） | https://narcb9vct6.feishu.cn/wiki/EaHAwTrKQiwR4akgb9OcTZi3nAh | ✅ 2026-10-20 上传并回读核对 |
+| 飞书在线云文档 V1（初版，保留可查） | https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb | ✅ 在线 |
 | ANS 主站仓库 Skill 备份 | https://github.com/1008611-creater/ans-platform 分支 `feat/dev3-ans-skill-refactor`（提交 `cbfad813`）路径 `ai-video-skills-source/ans-p5-brush-cartoon-animation/` | ✅ 与总仓 12 个文件 blob 逐一校验一致 |
 | 跨电脑便携压缩包 | `ans-p5-brush-cartoon-v46-portable-kit.zip`（约 30 MB，含工程 + 素材 + Skill + 本交接文档） | ✅ 已生成 |
 

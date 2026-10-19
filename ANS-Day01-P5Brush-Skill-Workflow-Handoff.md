@@ -3,7 +3,8 @@
 🟢 ANS (AI Never Stops) · 手绘水彩双主角动画（p5.js + p5.brush V4.6 定稿）复利 Skill、工作流与跨电脑交接文档
 
 > **版本**：V2 复利归档复核版（2026-10-20） · **本文件即飞书云文档的版本化源稿**（可直接重新导入飞书生成新版在线文档）
-> **V1 飞书在线文档**：https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb
+> **V2 飞书在线文档（本文档当前在线版）**：https://narcb9vct6.feishu.cn/wiki/EaHAwTrKQiwR4akgb9OcTZi3nAh
+> **V1 飞书在线文档（初版）**：https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb
 > **品牌铁律**：ANS 的唯一官方全称是 **AI Never Stops**（主站 https://ans.cauai.fun），严禁误写为 AI Native Society / AI Native Studio。
 
 ---
@@ -17,7 +18,7 @@
 | 定稿素材 | `ClaudeAnimationBase/out/check/ans_chars_sheet.jpg`（双主角 6 态设定图）+ `ClaudeAnimationBase/out/ans_day01_stills/t*.png`（5 幕 720p 关键帧） | ✅ 已入库 |
 | 专属复利 Skill | 仓库内 `.agents/skills/ans-p5-brush-cartoon-animation/`（SKILL.md + scripts/ + references/，共 12 个文件） | ✅ 已入库 |
 | ANS 主站仓库 Skill 备份 | GitHub `1008611-creater/ans-platform` 分支 `feat/dev3-ans-skill-refactor`（提交 `cbfad813`）路径 `ai-video-skills-source/ans-p5-brush-cartoon-animation/` | ✅ 已推送，与总仓 12 个文件逐一 blob 校验一致 |
-| 飞书在线云文档 | V1：https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb （含内嵌高清设定图与 5 幕关键帧） | ✅ 已上传并回读核对 |
+| 飞书在线云文档 | V2（当前版）：https://narcb9vct6.feishu.cn/wiki/EaHAwTrKQiwR4akgb9OcTZi3nAh ｜ V1（初版）：https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb （均含内嵌高清设定图与 5 幕关键帧） | ✅ 已上传并回读核对 |
 | 本机工作区 Skill（可被 Agent 自动发现） | `<仓库>/\.agents/skills/ans-p5-brush-cartoon-animation/` | ✅ 打开该仓库即为工作区即可自动加载 |
 | 本机全局 Skill（Gemini / Codex 双端） | `~/.gemini/config/skills/ans-p5-brush-cartoon-animation/`、`~/.codex/skills/ans-p5-brush-cartoon-animation/` | ✅ 已安装（各 12 个文件，SHA256 与仓库一致） |
 | 跨电脑便携压缩包（离线可用，含工程 + 素材 + Skill） | `C:\Users\lsb\Downloads\ans-p5-brush-cartoon-v46-portable-kit.zip`（约 30 MB） | ✅ 已生成并逐项核对 |
