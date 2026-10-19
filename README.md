@@ -21,6 +21,8 @@
 | 跨电脑便携压缩包 | `ans-p5-brush-cartoon-v46-portable-kit.zip`（约 30 MB，含工程 + 素材 + Skill + 本交接文档） | ✅ 已生成 |
 
 > 更新飞书云文档：在飞书云盘点「上传 → 导入为在线文档 → Microsoft Word」选择 `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` 即可（约 10 秒，图片自动内嵌）。修改图文内容后请同步更新 `.md` 与 `.docx` 两个文件，保持「仓库源稿 = 飞书文档」一致。
+>
+> **版本唯一性守卫（机器断言）**：`node scripts/check-authority.mjs` —— 强制「飞书只存唯一权威版、仓库引用只指向它、废弃版本文档 ID 不得回流」。改动归档相关文件后必须跑一次，PASS 才可提交。
 
 ---
 
