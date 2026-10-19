@@ -1,0 +1,54 @@
+{
+  "title": "🟢 Day 01 / 28 · ANS (AI Never Stops) 正式上线",
+  "brand": "ANS (AI Never Stops)",
+  "url": "https://ans.cauai.fun",
+  "style": "12-aurora-glass × 03-kinetic-type × 08-morph",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 15.0,
+  "stills": [1.2, 2.8, 4.8, 6.5, 8.5, 10.5, 12.5, 14.2],
+  "acts": [
+    {
+      "id": "act1-pain-and-day1-three-things",
+      "t0": 0.0,
+      "t1": 3.2,
+      "subtitle": "90% 的人每天都在刷 AI，最后手里却只剩聊天记录和收藏夹吃灰。",
+      "modules": [
+        "痛点暴击：散落的历史聊天记录 + 收藏夹吃灰 ★ 99+",
+        "🟢 Day 01 / 28 · ANS (AI Never Stops) 正式上线（https://ans.cauai.fun）",
+        "Day 1 最实在的三件事安排到位：① 顶配模型直接爽玩 · ② 最快时间上手顶级 AI 项目 · ③ 注册即送算力福利"
+      ]
+    },
+    {
+      "id": "act2-flagship-models-and-fast-projects",
+      "t0": 3.2,
+      "t1": 7.2,
+      "subtitle": "第一件，顶配模型直接爽玩；第二件，最快时间上手顶级 AI 项目。",
+      "modules": [
+        "第一件，顶配模型直接爽玩：一站体验满血 GPT-6-Astra、大肥鱼 v4.1-1017、Opus 5.5 等当下最顶的旗舰模型",
+        "第二件，最快时间上手顶级 AI 项目：不用到处翻教程配环境，全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品"
+      ]
+    },
+    {
+      "id": "act3-free-compute-and-28day-flag",
+      "t0": 7.2,
+      "t1": 11.5,
+      "subtitle": "第三件，注册即送免费额度直接开造；28 天里每天要么真改进，要么全员额度重置！",
+      "modules": [
+        "第三件，注册即送算力福利：进来就有免费额度，直接开造，不玩套路",
+        "立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）"
+      ]
+    },
+    {
+      "id": "act4-summary-and-morph-finale",
+      "t0": 11.5,
+      "t1": 15.0,
+      "subtitle": "ANS · AI Never Stops — 让改进开始吧。",
+      "modules": [
+        "Day 01 最实在的三件事全览 × 28 天 Flag 公开监督",
+        "08-Morph 3D 磨砂玻璃 ANS 巨幅主标题 + AI Never Stops | https://ans.cauai.fun + 真实薄荷绿小恐龙伴侣眨眼挥手定格"
+      ]
+    }
+  ]
+}

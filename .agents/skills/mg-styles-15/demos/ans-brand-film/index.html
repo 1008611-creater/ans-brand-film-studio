@@ -1,0 +1,2921 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ANS — AI Never Stops (Official Launch Film · ans.cauai.fun)</title>
+<style>
+  @font-face {
+    font-family: 'Bricolage';
+    src: url('./assets/fonts/Bricolage-800.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Bricolage';
+    src: url('./assets/fonts/Bricolage-700.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Inter Tight';
+    src: url('./assets/fonts/InterTight-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Inter Tight';
+    src: url('./assets/fonts/InterTight-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Inter Tight';
+    src: url('./assets/fonts/InterTight-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('./assets/fonts/JetBrainsMono-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('./assets/fonts/JetBrainsMono-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    background: #040510;
+    overflow: hidden;
+    font-family: 'Inter Tight', 'PingFang SC', 'Hiragino Sans GB', 'Heiti SC', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas#gl {
+    display: block;
+    width: 1920px;
+    height: 1080px;
+  }
+</style>
+</head>
+<body>
+<canvas id="gl" width="1920" height="1080"></canvas>
+<svg id="morphSvg" width="0" height="0" style="position:absolute;left:-9999px;top:-9999px"></svg>
+
+<script src="./timeline_data.js"></script>
+<script>
+const __TL = window.__ANS_TIMELINE || {
+  total_duration: 121.96,
+  fps: 30,
+  chapters: [
+    [0.00, 14.313], [14.313, 29.286], [29.286, 43.532], [43.532, 58.173],
+    [58.173, 73.236], [73.236, 86.232], [86.232, 108.764], [108.764, 121.959]
+  ],
+  subtitles: []
+};
+window.DEMO = {
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  duration: __TL.total_duration,
+  motionBlur: { samples: 2, shutter: 0.5 }
+};
+</script>
+
+<script type="module">
+import { VS, FS_AURORA, FS_DOWN, FS_BLUR, FS_CARD, FS_OVER, FS_LENS, FS_FINAL, FS_GLYPH } from './shaders.js';
+import * as opentype from '/node_modules/opentype.js/dist/opentype.min.mjs';
+
+const TL = window.__ANS_TIMELINE || {
+  total_duration: 121.96,
+  fps: 30,
+  chapters: [
+    [0.00, 14.313], [14.313, 29.286], [29.286, 43.532], [43.532, 58.173],
+    [58.173, 73.236], [73.236, 86.232], [86.232, 108.764], [108.764, 121.959]
+  ],
+  subtitles: []
+};
+const W = 1920, H = 1080, FPS = 30, DUR = TL.total_duration;
+const DPR = window.devicePixelRatio || 1;
+const RW = Math.round(W * DPR), RH = Math.round(H * DPR);
+const QW = Math.max(8, Math.round(RW / 4)), QH = Math.max(8, Math.round(RH / 4));
+const TAU = Math.PI * 2, D2R = Math.PI / 180;
+
+const F_CN = '"PingFang SC", "Hiragino Sans GB", "Heiti SC", -apple-system, sans-serif';
+const F_UI = '"Inter Tight", "PingFang SC", "Heiti SC", sans-serif';
+const F_DISP = '"Bricolage", "PingFang SC", "Heiti SC", sans-serif';
+const F_MONO = '"JetBrains Mono", "PingFang SC", monospace';
+
+// ------------------------------------------------------------------ 1. Math & Easing Curves
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const inv = (a, b, x) => clamp((x - a) / (b - a));
+const eSine = (t) => -(Math.cos(Math.PI * clamp(t)) - 1) / 2;
+const eOutSine = (t) => Math.sin(clamp(t) * Math.PI / 2);
+const eOutCubic = (t) => 1 - Math.pow(1 - clamp(t), 3);
+const eInOutCubic = (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const eOutBack = (t, s = 1.35) => { const x = clamp(t) - 1; return 1 + (s + 1) * x * x * x + s * x * x; };
+const seg = (t, a, b, e = eSine) => e(inv(a, b, t));
+
+function riseA(t, t0, dur = 0.65) {
+  const k = inv(t0, t0 + dur, t);
+  return { a: eSine(k), dy: 14 * (1 - eOutCubic(k)) };
+}
+
+const WHITE = (a = 1) => `rgba(255, 255, 255, ${a})`;
+const MINT = (a = 1) => `rgba(155, 224, 197, ${a})`;
+const CYAN = (a = 1) => `rgba(56, 189, 248, ${a})`;
+const GOLD = (a = 1) => `rgba(251, 191, 36, ${a})`;
+
+// ------------------------------------------------------------------ 2. Preload Fonts, Opentype TTF & Pre-Cached Live Tour Assets
+await Promise.all([
+  document.fonts.load(`800 220px "Bricolage"`, 'ANS').catch(() => {}),
+  document.fonts.load(`700 64px "Bricolage"`, 'AI Never Stops 44+ 3D 4K 80%').catch(() => {}),
+  document.fonts.load(`500 28px "Inter Tight"`, 'ans.cauai.fun Explore VibeHub Market CAUHub').catch(() => {}),
+  document.fonts.load(`700 22px "JetBrains Mono"`, 'SHA-256 80% ans.cauai.fun').catch(() => {}),
+]);
+await document.fonts.ready.catch(() => {});
+
+const bricolageBuf = await fetch('./assets/fonts/Bricolage-800.ttf').then(r => r.arrayBuffer());
+const fontDisplay = opentype.parse(bricolageBuf);
+
+function loadImg(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+const IMG_MANIFEST = {
+  mascot: '/ans-assets/mascot/ans-mascot.png',
+  mascotFallback: './assets/ans-mascot.png',
+  helloAlgo: '/ans-assets/catalog/gitglow-v1/hello-algo.webp',
+  hermesAgent: '/ans-assets/catalog/gitglow-v1/hermes-agent.webp',
+  remotionVideo: '/ans-assets/catalog/gitglow-v1/remotion-video.webp',
+  aiAgents: '/ans-assets/catalog/gitglow-v1/ai-agents-for-beginners.webp',
+  grain: '/assets/textures/grain/grain_fine_2048.png',
+  // Pre-cached live website tour pages
+  exploreAll: './assets/tour/explore_all.webp',
+  exploreLearn: './assets/tour/explore_learn.webp',
+  exploreGithub: './assets/tour/explore_github.webp',
+  exploreProd: './assets/tour/explore_prod.webp',
+  exploreComp: './assets/tour/explore_comp.webp',
+  vibehubAi: './assets/tour/vibehub_ai.webp',
+  vibehubFe: './assets/tour/vibehub_fe.webp',
+  vibehubStyle: './assets/tour/vibehub_style.webp',
+  vibehubCourses: './assets/tour/vibehub_courses.webp',
+  vibehubPractice: './assets/tour/vibehub_practice.webp',
+  marketClean: './assets/tour/market_clean.webp',
+  teamsClean: './assets/tour/teams_clean.webp',
+  compMain: './assets/tour/competitions_main.webp',
+  agriMain: './assets/tour/agrihackathon_main.webp',
+  hubsMain: './assets/tour/hubs_main.webp',
+};
+
+for (let i = 0; i < 36; i++) {
+  IMG_MANIFEST[`dino_${String(i).padStart(2, '0')}`] = `./assets/tour/dino_${String(i).padStart(2, '0')}.webp`;
+}
+
+const ASSETS = {};
+await Promise.all(
+  Object.entries(IMG_MANIFEST).map(async ([k, url]) => {
+    ASSETS[k] = await loadImg(url);
+  })
+);
+if (!ASSETS.mascot) ASSETS.mascot = ASSETS.mascotFallback;
+
+// Official ANS Negative-Space Triangle Monogram Logo (ans-logo-dark.svg)
+const ANS_S_PATH = new Path2D("M294.7 197.7L308.8 197.5L309.3 197.9L312.1 197.9L319.3 199.2L328.9 202.1L340.3 207.9L348.7 214.8L355.9 223.5L361.1 234.3L364.0 245.2L364.2 255.8L321.7 255.8L321.0 248.1L318.1 241.8L315.7 238.9L311.2 235.4L305.0 233.3L297.3 233.3L290.2 235.8L285.6 239.7L282.8 245.2L282.8 247.6L282.3 248.1L283.7 253.9L286.6 258.5L290.2 262.0L304.5 271.6L338.9 292.8L344.2 296.5L354.0 305.1L359.7 312.1L363.5 318.4L367.8 330.0L368.3 334.2L368.8 334.6L368.3 335.0L368.8 335.8L368.3 349.2L365.9 358.7L363.5 364.5L360.6 369.5L353.0 378.7L346.1 384.3L337.0 389.3L330.3 391.8L323.6 393.5L285.9 393.5L278.7 391.4L268.7 386.8L262.0 382.2L256.5 377.4L250.3 369.5L244.5 358.3L242.6 351.6L242.6 349.2L241.7 347.1L242.2 346.7L241.2 343.7L241.7 343.3L241.2 342.5L241.4 332.7L284.0 332.7L284.2 336.3L284.7 336.7L284.2 337.1L284.7 341.2L285.6 344.6L289.9 352.5L295.4 356.8L302.6 359.3L305.0 359.3L305.5 359.8L306.4 359.3L310.7 359.3L315.0 358.1L318.4 356.4L322.9 352.1L325.3 347.1L325.8 342.5L323.9 336.7L321.5 332.9L318.1 329.2L310.2 323.6L309.8 322.7L301.6 318.2L294.5 313.2L293.0 312.8L268.2 296.9L262.5 292.8L254.6 285.9L248.4 278.4L244.1 270.9L240.7 261.4L240.2 256.4L239.8 256.0L240.2 240.2L241.2 236.0L244.5 227.3L248.4 220.6L250.8 217.7L254.6 213.5L259.6 209.6L262.5 207.5L269.6 203.8L280.1 200.0L287.8 198.4Z");
+
+function makeAnsLogoCanvas(fillStyle) {
+  const cv = document.createElement('canvas');
+  cv.width = 480; cv.height = 420;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = fillStyle;
+  ctx.beginPath();
+  ctx.moveTo(240, 28); ctx.lineTo(466, 392); ctx.lineTo(14, 392); ctx.closePath();
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.moveTo(240, 150); ctx.lineTo(283, 212); ctx.lineTo(198, 212); ctx.closePath();
+  ctx.fill();
+  ctx.save();
+  ctx.translate(-6.7, -9.95); ctx.scale(1.05, 1.05);
+  ctx.beginPath();
+  ctx.moveTo(108, 241); ctx.lineTo(134, 199); ctx.lineTo(190, 303); ctx.lineTo(190, 199);
+  ctx.lineTo(233, 199); ctx.lineTo(233, 396); ctx.lineTo(190, 396); ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(134, 304); ctx.lineTo(134, 396); ctx.lineTo(89, 396); ctx.lineTo(89, 376); ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(-9.810, -16.685); ctx.scale(1.05, 1.05);
+  ctx.fill(ANS_S_PATH, 'evenodd');
+  ctx.restore();
+  ctx.globalCompositeOperation = 'source-over';
+  return cv;
+}
+
+const ansLogoWhiteCv = makeAnsLogoCanvas('#F4F7FB');
+const ansLogoMintCv = makeAnsLogoCanvas('#9BE0C5');
+const ansLogoDarkCv = makeAnsLogoCanvas('#041016');
+
+function drawAnsLogo(g, cx, cy, width, variant = 'white', opts = {}) {
+  const height = width * (420 / 480);
+  const src = variant === 'mint' ? ansLogoMintCv : (variant === 'dark' ? ansLogoDarkCv : ansLogoWhiteCv);
+  g.save();
+  if (opts.glow) {
+    g.shadowColor = opts.glowColor || 'rgba(155, 224, 197, 0.55)';
+    g.shadowBlur = opts.glowBlur || 18;
+  }
+  g.drawImage(src, cx - width / 2, cy - height / 2, width, height);
+  g.restore();
+}
+
+// 100% Authentic Unmodified 2D Mascot (/public/mascot/ans-mascot.png)
+const MSZ = 640;
+const mascotOpenCv = document.createElement('canvas'); mascotOpenCv.width = MSZ; mascotOpenCv.height = MSZ;
+if (ASSETS.mascot) {
+  const gO = mascotOpenCv.getContext('2d');
+  gO.drawImage(ASSETS.mascot, 0, 0, MSZ, MSZ);
+  const imgData = gO.getImageData(0, 0, MSZ, MSZ);
+  const d = imgData.data;
+  for (let y = 0; y < MSZ; y++) {
+    for (let x = 0; x < MSZ; x++) {
+      const idx = (y * MSZ + x) * 4;
+      const a = d[idx + 3];
+      if (a === 0) continue;
+      const r = d[idx], g = d[idx + 1], b = d[idx + 2];
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      if (y > MSZ * 0.72 && chroma < 14 && g < r + 8 && luma < 140) {
+        const keep = Math.max(0, Math.min(1, (luma - 95) / 45)) * 0.10;
+        d[idx + 3] = Math.round(a * keep);
+      }
+    }
+  }
+  gO.putImageData(imgData, 0, 0);
+}
+
+// ------------------------------------------------------------------ 3. Opentype.js 08-Morph Paths for "ANS" Frosted-Glass Monument
+const morphSvg = document.getElementById('morphSvg');
+function sampleSvgPath(d, n, closed = true) {
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  morphSvg.appendChild(p);
+  const L = Math.max(1e-3, p.getTotalLength());
+  const out = [];
+  const den = closed ? n : Math.max(1, n - 1);
+  for (let i = 0; i < n; i++) {
+    const q = p.getPointAtLength((L * i) / den);
+    out.push([q.x, q.y]);
+  }
+  morphSvg.removeChild(p);
+  return out;
+}
+function polyArea(P) {
+  let a = 0;
+  for (let i = 0; i < P.length; i++) {
+    const p = P[i], q = P[(i + 1) % P.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
+}
+const orientCW = P => (polyArea(P) < 0 ? P.slice().reverse() : P);
+const orientCCW = P => (polyArea(P) > 0 ? P.slice().reverse() : P);
+function polyCentroid(P) {
+  let x = 0, y = 0;
+  for (const p of P) { x += p[0]; y += p[1]; }
+  return [x / P.length, y / P.length];
+}
+function circlePts(cx, cy, r, n) {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (TAU * i) / n;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
+}
+function bestShift(A, B) {
+  const n = A.length;
+  let best = Infinity, bs = 0;
+  for (let s = 0; s < n; s++) {
+    let e = 0;
+    for (let i = 0; i < n; i += 2) {
+      const b = B[(i + s) % n];
+      const dx = A[i][0] - b[0], dy = A[i][1] - b[1];
+      e += dx * dx + dy * dy;
+      if (e >= best) break;
+    }
+    if (e < best) { best = e; bs = s; }
+  }
+  return bs;
+}
+const shiftPoly = (B, s) => B.map((_, i) => B[(i + s) % B.length]);
+const alignPoly = (A, B) => shiftPoly(B, bestShift(A, B));
+const lerpPoly = (A, B, t) => A.map((a, i) => [lerp(a[0], B[i][0], t), lerp(a[1], B[i][1], t)]);
+
+function commandsToSubpathStrings(commands) {
+  const subs = [];
+  let cur = '';
+  for (const c of commands) {
+    if (c.type === 'M') {
+      if (cur) subs.push(cur + 'Z');
+      cur = `M${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+    } else if (c.type === 'L') {
+      cur += `L${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+    } else if (c.type === 'Q') {
+      cur += `Q${c.x1.toFixed(2)},${c.y1.toFixed(2)} ${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+    } else if (c.type === 'C') {
+      cur += `C${c.x1.toFixed(2)},${c.y1.toFixed(2)} ${c.x2.toFixed(2)},${c.y2.toFixed(2)} ${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+    } else if (c.type === 'Z') {
+      cur += 'Z'; subs.push(cur); cur = '';
+    }
+  }
+  if (cur) subs.push(cur + 'Z');
+  return subs;
+}
+
+function buildCleanContoursForGlyph(ch, gPath) {
+  const cmds = gPath.commands;
+  if (ch === 'A') {
+    const moves = [];
+    let cur = [];
+    for (const c of cmds) {
+      if (c.type === 'M') {
+        if (cur.length) moves.push(cur);
+        cur = [[c.x, c.y]];
+      } else if (c.x !== undefined) {
+        cur.push([c.x, c.y]);
+      }
+    }
+    if (cur.length) moves.push(cur);
+    if (moves.length >= 2) {
+      const legs = moves[0], bar = moves[1];
+      const yBarBot = Math.max(...bar.map(p => p[1]));
+      const yBarTop = Math.min(...bar.map(p => p[1]));
+      const botInL = legs[0], botOutL = legs[1], topOutL = legs[2], topOutR = legs[3], botOutR = legs[4], botInR = legs[5], topInR = legs[6], topInL = legs[7];
+      const interpX = (p0, p1, y) => p0[0] + (p1[0] - p0[0]) * ((y - p0[1]) / (p1[1] - p0[1]));
+      const xInL_bot = interpX(botInL, topInL, yBarBot);
+      const xInR_bot = interpX(botInR, topInR, yBarBot);
+      const xInL_top = interpX(botInL, topInL, yBarTop);
+      const xInR_top = interpX(botInR, topInR, yBarTop);
+      const outerD = `M ${botOutL[0].toFixed(2)},${botOutL[1].toFixed(2)} L ${topOutL[0].toFixed(2)},${topOutL[1].toFixed(2)} L ${topOutR[0].toFixed(2)},${topOutR[1].toFixed(2)} L ${botOutR[0].toFixed(2)},${botOutR[1].toFixed(2)} L ${botInR[0].toFixed(2)},${botInR[1].toFixed(2)} L ${xInR_bot.toFixed(2)},${yBarBot.toFixed(2)} L ${xInL_bot.toFixed(2)},${yBarBot.toFixed(2)} L ${botInL[0].toFixed(2)},${botInL[1].toFixed(2)} Z`;
+      const holeD = `M ${xInL_top.toFixed(2)},${yBarTop.toFixed(2)} L ${topInL[0].toFixed(2)},${topInL[1].toFixed(2)} L ${topInR[0].toFixed(2)},${topInR[1].toFixed(2)} L ${xInR_top.toFixed(2)},${yBarTop.toFixed(2)} Z`;
+      return { outerD, holeDs: [holeD] };
+    }
+  }
+  const subStrs = commandsToSubpathStrings(cmds);
+  return { outerD: subStrs[0], holeDs: subStrs.slice(1) };
+}
+
+const N_OUTER = 220, N_HOLE = 72;
+const ANS_MORPH = (() => {
+  const fontSize = 258;
+  const tracking = 16;
+  const chars = ['A', 'N', 'S'];
+  const glyphs = chars.map(ch => fontDisplay.charToGlyph(ch));
+  const scale = fontSize / fontDisplay.unitsPerEm;
+  const advs = glyphs.map(g => g.advanceWidth * scale);
+  const totalW = advs.reduce((a, b) => a + b, 0) + tracking * (chars.length - 1);
+  const centerX = 876;
+  const baseY = 528;
+  let curX = centerX - totalW / 2;
+
+  const items = chars.map((ch, idx) => {
+    const gPath = glyphs[idx].getPath(curX, baseY, fontSize);
+    const { outerD, holeDs } = buildCleanContoursForGlyph(ch, gPath);
+    const outer = orientCW(sampleSvgPath(outerD, N_OUTER, true));
+    const cen = polyCentroid(outer);
+
+    let primD = '';
+    const r = 92;
+    if (ch === 'A') {
+      primD = `M ${cen[0]},${cen[1] - r * 1.12} L ${cen[0] + r},${cen[1] + r * 0.9} L ${cen[0] - r},${cen[1] + r * 0.9} Z`;
+    } else if (ch === 'N') {
+      primD = `M ${cen[0] - r * 0.85},${cen[1] - r * 0.92} L ${cen[0] + r * 0.85},${cen[1] - r * 0.92} L ${cen[0] + r * 0.92},${cen[1] + r * 0.92} L ${cen[0] - r * 0.92},${cen[1] + r * 0.92} Z`;
+    } else {
+      primD = `M ${cen[0]},${cen[1] - r} A ${r},${r} 0 1 1 ${cen[0] - 0.01},${cen[1] - r} Z`;
+    }
+    const primRaw = orientCW(sampleSvgPath(primD, N_OUTER, true));
+    const primAligned = alignPoly(outer, primRaw);
+    const singCircle = alignPoly(primAligned, circlePts(centerX, 460, 108, N_OUTER));
+
+    const holes = holeDs.map(d => {
+      const hPts = orientCCW(sampleSvgPath(d, N_HOLE, true));
+      const hCen = polyCentroid(hPts);
+      const hSeed = orientCCW(circlePts(hCen[0], hCen[1], 2.0, N_HOLE));
+      return { target: hPts, seed: alignPoly(hPts, hSeed), cen: hCen };
+    });
+
+    const rightEdge = curX + advs[idx];
+    curX += advs[idx] + tracking;
+    return { ch, idx, outer, prim: primAligned, sing: singCircle, holes, cen, rightEdge };
+  });
+
+  const lastRight = items[items.length - 1].rightEdge;
+  return { items, totalW, centerX, baseY, fontSize, ringX: lastRight + 42, ringY: baseY - 36, ringR: 26, emblemCX: 408, emblemCY: 432 };
+})();
+
+// ------------------------------------------------------------------ 4. Aurora Mesh Gradient & 3D Camera Choreography
+const hex = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+const PAL = {
+  base: '#040510',
+  mint: '#7CE8C2',
+  cyan: '#34CFF0',
+  blue: '#2F54F2',
+  violet: '#6846F5',
+  emerald: '#12B981',
+  indigo: '#241E88',
+  warmGold: '#F59E0B',
+};
+
+function loopBezier(pts, period, phase) {
+  const n = pts.length;
+  return (t) => {
+    let u = (((t / period + phase) % 1) + 1) % 1 * n;
+    const i = Math.floor(u), s = u - i;
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    const a = 1 - s;
+    return [0, 1].map((k) => a * a * a * p1[k] + 3 * a * a * s * c1[k] + 3 * a * s * s * c2[k] + s * s * s * p2[k]);
+  };
+}
+
+const BLOBS = [
+  { col: PAL.mint, rx: 470, ry: 290, ang: 16, i: 0.78, path: loopBezier([[480, 420], [680, 360], [820, 490], [520, 520]], 26, 0.05) },
+  { col: PAL.cyan, rx: 420, ry: 260, ang: -24, i: 0.72, path: loopBezier([[1480, 310], [1620, 420], [1360, 480], [1320, 290]], 30, 0.55) },
+  { col: PAL.blue, rx: 520, ry: 280, ang: 28, i: 0.92, path: loopBezier([[1440, 820], [1260, 680], [1120, 640], [1380, 920]], 24, 0.15) },
+  { col: PAL.violet, rx: 480, ry: 260, ang: -10, i: 0.85, path: loopBezier([[780, 860], [540, 780], [680, 940], [1040, 880]], 32, 0.48) },
+  { col: PAL.emerald, rx: 520, ry: 340, ang: 6, i: 0.45, path: loopBezier([[1020, 560], [1160, 510], [1060, 640], [880, 600]], 36, 0.30) },
+  { col: PAL.warmGold, rx: 280, ry: 190, ang: 12, i: 0.36, path: loopBezier([[1180, 460], [1040, 540], [920, 560], [1120, 420]], 22, 0.12) },
+  { col: PAL.indigo, rx: 560, ry: 240, ang: -6, i: 0.65, path: loopBezier([[1140, 1040], [1300, 980], [1020, 960], [940, 1040]], 28, 0.22) },
+];
+
+const F_LEN = 2000;
+function rotM(rx, ry, rz) {
+  const a = rx * D2R, b = ry * D2R, c = rz * D2R;
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cc = Math.cos(c), sc = Math.sin(c);
+  const Rx = [[1, 0, 0], [0, ca, -sa], [0, sa, ca]];
+  const Ry = [[cb, 0, sb], [0, 1, 0], [-sb, 0, cb]];
+  const Rz = [[cc, -sc, 0], [sc, cc, 0], [0, 0, 1]];
+  const mul = (A, B) => A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+  const M = mul(Rz, mul(Ry, Rx));
+  return { U: [M[0][0], M[1][0], M[2][0]], V: [M[0][1], M[1][1], M[2][1]], N: [M[0][2], M[1][2], M[2][2]] };
+}
+
+function getChapterIndex(tReal) {
+  const chs = TL.chapters || [];
+  for (let i = 0; i < chs.length; i++) {
+    if (tReal <= chs[i][1] || i === chs.length - 1) return i;
+  }
+  return 0;
+}
+
+// Dynamic 3D Camera Push & Pan across all 8 chapters
+function cameraAt(t, tReal) {
+  const ch = getChapterIndex(tReal);
+  const [r0, r1] = TL.chapters[ch] || [0, 14.3];
+  const u = clamp((tReal - r0) / Math.max(0.1, r1 - r0));
+  if (ch === 0) {
+    // Chapter 0: Sweep from left pain-point card -> right pain-point card -> push into Day 01 center hero
+    if (tReal < 6.4) {
+      return { x: lerp(-24, 24, eInOutCubic(tReal / 6.4)), y: lerp(-6, 4, u), z: lerp(230, 175, eOutCubic(u)) };
+    }
+    return { x: lerp(22, 0, eInOutCubic((tReal - 6.4) / 7.9)), y: 0, z: lerp(175, 145, eInOutCubic((tReal - 6.4) / 7.9)) };
+  }
+  if (ch >= 1 && ch <= 6) {
+    // Chapters 1..6: Live interactive browser stage — gentle commercial camera drift + push-in on focus moments
+    const push = Math.sin(u * Math.PI) * 32;
+    const panX = Math.sin(tReal * 0.42) * 14;
+    const panY = Math.cos(tReal * 0.35) * 6;
+    return { x: panX, y: panY, z: 145 - push };
+  }
+  const k = seg(t, 13.0, 14.0, eOutCubic);
+  return { x: 0, y: 0, z: lerp(180, 230, k) };
+}
+function camO(cam) { return [960 + cam.x, 540 + cam.y, -F_LEN + cam.z]; }
+
+// ------------------------------------------------------------------ 5. WebGL2 Pipeline Setup
+const canvas = document.getElementById('gl');
+canvas.width = RW; canvas.height = RH;
+const gl = canvas.getContext('webgl2', {
+  preserveDrawingBuffer: true,
+  antialias: false,
+  alpha: false,
+  premultipliedAlpha: false,
+  powerPreference: 'high-performance'
+});
+if (!gl) throw new Error('WebGL2 unavailable');
+const hasFloat = !!gl.getExtension('EXT_color_buffer_float');
+gl.getExtension('OES_texture_float_linear');
+const IFMT = hasFloat ? gl.RGBA16F : gl.RGBA8;
+const ITYPE = hasFloat ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+
+function compile(fs) {
+  const mk = (type, src) => {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); throw new Error('shader compile'); }
+    return s;
+  };
+  const p = gl.createProgram();
+  gl.attachShader(p, mk(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(p)); throw new Error('link'); }
+  const loc = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const u = gl.getActiveUniform(p, i);
+    loc[u.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, u.name);
+  }
+  return { p, loc };
+}
+
+const P = {
+  aurora: compile(FS_AURORA),
+  down: compile(FS_DOWN),
+  blur: compile(FS_BLUR),
+  card: compile(FS_CARD),
+  over: compile(FS_OVER),
+  lens: compile(FS_LENS),
+  final: compile(FS_FINAL),
+  glyph: compile(FS_GLYPH),
+};
+const vao = gl.createVertexArray();
+
+function makeTarget(w, h, fmt = IFMT, type = ITYPE) {
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, fmt, w, h, 0, gl.RGBA, type, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fb, w, h };
+}
+
+const T = {
+  sceneA: makeTarget(RW, RH),
+  sceneB: makeTarget(RW, RH),
+  lens: makeTarget(RW, RH),
+  g1: makeTarget(RW, RH),
+  g2: makeTarget(RW, RH),
+  q1: makeTarget(QW, QH),
+  q2: makeTarget(QW, QH),
+  qL: makeTarget(QW, QH),
+  qB: makeTarget(QW, QH),
+};
+
+function canvasTex(mip = false) {
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return tex;
+}
+function upload(tex, cv, mip = false) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+  if (mip) gl.generateMipmap(gl.TEXTURE_2D);
+}
+
+const grainTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, grainTex);
+gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ASSETS.grain);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+function gaussTaps(sigma) {
+  const R = Math.min(29, Math.max(1, Math.ceil(sigma * 3)));
+  const w = []; let sum = 0;
+  for (let i = 0; i <= R; i++) { const v = Math.exp(-i * i / (2 * sigma * sigma)); w.push(v); sum += i ? 2 * v : v; }
+  for (let i = 0; i <= R; i++) w[i] /= sum;
+  const offs = [0], ws = [w[0]];
+  for (let i = 1; i <= R; i += 2) { const a = w[i], b = i + 1 <= R ? w[i + 1] : 0, s = a + b; offs.push(s > 0 ? (i * a + (i + 1) * b) / s : i); ws.push(s); }
+  while (offs.length < 16) { offs.push(0); ws.push(0); }
+  return { offs: new Float32Array(offs.slice(0, 16)), ws: new Float32Array(ws.slice(0, 16)), n: Math.min(16, Math.ceil(R / 2) + 1) };
+}
+const TAPS_FROST = gaussTaps(30 * DPR / 4);
+const TAPS_LENS = gaussTaps(22 * DPR / 4);
+const TAPS_BLOOM = gaussTaps(40 * DPR / 4);
+const TAPS_GN = gaussTaps(4.5 * DPR);
+const TAPS_GW = gaussTaps(12 * DPR / 4);
+const TAPS_GF = gaussTaps(18 * DPR / 4);
+
+function unbindAll() {
+  for (let u = 0; u < 6; u++) { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, null); }
+}
+function use(prog, target) {
+  unbindAll();
+  gl.useProgram(prog.p);
+  if (target) { gl.bindFramebuffer(gl.FRAMEBUFFER, target.fb); gl.viewport(0, 0, target.w, target.h); }
+  else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, RW, RH); }
+  const w = target ? target.w : RW, h = target ? target.h : RH;
+  if (prog.loc.uRes) gl.uniform2f(prog.loc.uRes, w, h);
+  if (prog.loc.uDPR) gl.uniform1f(prog.loc.uDPR, DPR * (target ? target.w / RW : 1));
+  return prog.loc;
+}
+function bindTex(unit, tex, loc) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(loc, unit);
+}
+function draw() { gl.bindVertexArray(vao); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+function blurInto(src, dst, taps, thresh = 0) {
+  let L = use(P.down, T.q2); bindTex(0, src.tex, L.uSrc); gl.uniform2f(L.uSrcTexel, 1 / src.w, 1 / src.h); gl.uniform1f(L.uThresh, thresh); draw();
+  L = use(P.blur, T.q1); bindTex(0, T.q2.tex, L.uSrc); gl.uniform2f(L.uDir, 1, 0); gl.uniform1fv(L.uOff, taps.offs); gl.uniform1fv(L.uW, taps.ws); gl.uniform1i(L.uN, taps.n); draw();
+  L = use(P.blur, dst); bindTex(0, T.q1.tex, L.uSrc); gl.uniform2f(L.uDir, 0, 1); gl.uniform1fv(L.uOff, taps.offs); gl.uniform1fv(L.uW, taps.ws); gl.uniform1i(L.uN, taps.n); draw();
+}
+
+// ------------------------------------------------------------------ 6. Glass UI Helpers
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+function drawRoundedImage(g, img, x, y, w, h, r = 18, opts = {}) {
+  if (!img) return;
+  const {
+    fit = 'cover',
+    stroke = 'rgba(255, 255, 255, 0.26)',
+    lineWidth = 1.2,
+    shadow = true,
+    chromeUrl = '',
+    badge = '',
+    badgeBg = 'rgba(11, 15, 25, 0.88)',
+    badgeColor = '#9BE0C5',
+    captionTitle = '',
+    captionSub = '',
+    alpha = 1
+  } = opts;
+
+  g.save();
+  g.globalAlpha *= alpha;
+  if (shadow) {
+    g.save();
+    g.shadowColor = 'rgba(4, 6, 18, 0.36)';
+    g.shadowBlur = 24;
+    g.shadowOffsetY = 10;
+    rr(g, x, y, w, h, r);
+    g.fillStyle = 'rgba(12, 16, 28, 0.45)';
+    g.fill();
+    g.restore();
+  }
+
+  g.save();
+  rr(g, x, y, w, h, r);
+  g.clip();
+
+  g.fillStyle = 'rgba(7, 10, 20, 0.92)';
+  g.fillRect(x, y, w, h);
+
+  const hasTopBar = Boolean(chromeUrl || badge);
+  const barH = hasTopBar ? 28 : 0;
+  const footerH = captionTitle ? (captionSub ? 58 : 40) : 0;
+  const iy = y + barH;
+  const ih = Math.max(40, h - barH - footerH);
+  const iw = img.width || 800, imgH = img.height || 500;
+  const ir = iw / imgH, cr = w / ih;
+  let dw = w, dh = ih, dx = x, dy = iy;
+
+  if (fit === 'contain' || (captionTitle && cr < ir)) {
+    dw = w;
+    dh = w / ir;
+    dx = x;
+    dy = iy + Math.max(0, (ih - dh) * 0.5);
+  } else {
+    if (ir > cr) { dw = ih * ir; dx = x - (dw - w) * 0.25; }
+    else { dh = w / ir; dy = iy - (dh - ih) * 0.08; }
+  }
+  g.drawImage(img, dx, dy, dw, dh);
+
+  if (hasTopBar) {
+    g.fillStyle = 'rgba(12, 16, 28, 0.95)';
+    g.fillRect(x, y, w, barH);
+    let leftX = x + 12;
+    if (chromeUrl && w >= 260) {
+      ['#FF5F56', '#FFBD2E', '#27C93F'].forEach((c, i) => {
+        g.fillStyle = c;
+        g.beginPath(); g.arc(x + 14 + i * 10, y + barH / 2, 3.3, 0, TAU); g.fill();
+      });
+      leftX = x + 46;
+    }
+    drawAnsLogo(g, leftX + 7, y + barH / 2 + 0.5, 14, 'mint');
+    g.font = `700 10px ${F_DISP}`;
+    g.fillStyle = WHITE(0.92);
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.fillText('ANS', leftX + 17, y + barH / 2 + 0.5);
+
+    if (chromeUrl && (!badge || w >= 290)) {
+      g.font = `600 10px ${F_MONO}`;
+      g.fillStyle = WHITE(0.68);
+      g.textAlign = 'left';
+      g.fillText(chromeUrl, leftX + 46, y + barH / 2 + 0.5);
+    }
+
+    if (badge) {
+      g.font = `700 10px ${F_MONO}`;
+      const bw = g.measureText(badge).width + 16;
+      const bx = x + w - bw - 8;
+      const by = y + (barH - 20) / 2;
+      rr(g, bx, by, bw, 20, 10);
+      g.fillStyle = badgeBg;
+      g.fill();
+      g.strokeStyle = badgeColor;
+      g.lineWidth = 1;
+      g.stroke();
+      g.fillStyle = badgeColor;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(badge, bx + bw / 2, y + barH / 2 + 0.5);
+    }
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+  }
+
+  if (captionTitle) {
+    const footY = y + h - footerH;
+    const gr = g.createLinearGradient(0, footY - 18, 0, y + h);
+    gr.addColorStop(0, 'rgba(6, 9, 18, 0)');
+    gr.addColorStop(0.32, 'rgba(6, 9, 18, 0.90)');
+    gr.addColorStop(1, 'rgba(6, 9, 18, 0.98)');
+    g.fillStyle = gr;
+    g.fillRect(x, footY - 18, w, footerH + 18);
+
+    const titleFontPx = w < 215 ? 15 : 17;
+    g.font = `700 ${titleFontPx}px ${F_UI}`;
+    g.fillStyle = WHITE(0.98);
+    g.fillText(captionTitle, x + 14, y + h - (captionSub ? 30 : 14));
+    if (captionSub) {
+      const subFontPx = w < 215 ? 11.2 : 12.2;
+      g.font = `500 ${subFontPx}px ${F_UI}`;
+      g.fillStyle = MINT(0.92);
+      g.fillText(captionSub, x + 14, y + h - 11);
+    }
+  }
+  g.restore();
+
+  if (stroke) {
+    rr(g, x, y, w, h, r);
+    g.strokeStyle = stroke;
+    g.lineWidth = lineWidth;
+    g.stroke();
+  }
+  g.restore();
+}
+
+function drawMascot(g, cx, cy, size, t, opts = {}) {
+  const tReal = window.__tReal ?? t;
+  const bob = Math.sin(tReal * 2.6 + (opts.phase || 0)) * (opts.bobAmp ?? 3.5);
+  const tilt = Math.sin(tReal * 1.8 + (opts.phase || 0)) * (opts.tiltAmp ?? 0.015);
+
+  g.save();
+  g.translate(cx, cy + bob);
+  g.rotate(tilt);
+
+  const halo = g.createRadialGradient(0, 0, size * 0.08, 0, 0, size * 0.56);
+  halo.addColorStop(0, 'rgba(155, 224, 197, 0.34)');
+  halo.addColorStop(0.55, 'rgba(52, 207, 240, 0.14)');
+  halo.addColorStop(1, 'rgba(52, 207, 240, 0)');
+  g.fillStyle = halo;
+  g.beginPath(); g.arc(0, 0, size * 0.56, 0, TAU); g.fill();
+
+  g.drawImage(mascotOpenCv, -size / 2, -size / 2, size, size);
+  g.restore();
+}
+
+function drawGlassChip(g, x, y, w, h, text, opts = {}) {
+  const {
+    bg = 'rgba(10, 16, 28, 0.42)',
+    stroke = 'rgba(255, 255, 255, 0.28)',
+    color = WHITE(0.97),
+    font = `600 14px ${F_UI}`,
+    align = 'center',
+    dotColor = ''
+  } = opts;
+  g.save();
+  rr(g, x, y, w, h, h / 2);
+  g.fillStyle = bg; g.fill();
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1; g.stroke(); }
+  g.font = font;
+  g.fillStyle = color;
+  g.textBaseline = 'middle';
+  if (align === 'center') {
+    g.textAlign = 'center';
+    g.fillText(text, x + w / 2, y + h / 2 + 0.5);
+  } else {
+    g.textAlign = 'left';
+    let tx = x + 14;
+    if (dotColor) {
+      drawAnsLogo(g, tx + 9, y + h / 2 + 0.5, 18, dotColor === '#FBBF24' ? 'white' : 'mint');
+      tx += 24;
+      g.fillStyle = color;
+    }
+    g.fillText(text, tx, y + h / 2 + 0.5);
+  }
+  g.restore();
+}
+
+function drawLiveSparkline(g, x, y, w, h, t, col, seed = 0) {
+  const tReal = window.__tReal ?? t;
+  g.save();
+  g.beginPath();
+  const n = 22;
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const px = x + u * w;
+    const wave = Math.sin(tReal * 4.4 + i * 0.65 + seed) * 0.45 + Math.cos(tReal * 2.6 - i * 0.4 + seed * 1.7) * 0.35;
+    const py = y + h * (0.52 - 0.36 * wave);
+    if (i === 0) g.moveTo(px, py);
+    else g.lineTo(px, py);
+  }
+  g.strokeStyle = col;
+  g.lineWidth = 1.8;
+  g.stroke();
+  g.restore();
+}
+
+function drawPointerCursor(g, x, y, scale = 1.0, clickPulse = 0, accent = '#9BE0C5') {
+  g.save();
+  if (clickPulse > 0.01) {
+    for (let r = 0; r < 2; r++) {
+      const p = clamp(clickPulse - r * 0.15, 0, 1);
+      if (p <= 0) continue;
+      g.beginPath();
+      g.arc(x, y, 12 + (1 - p) * (36 + r * 18), 0, TAU);
+      g.strokeStyle = r === 0 ? accent : '#FFFFFF';
+      g.globalAlpha = p * (r === 0 ? 0.92 : 0.65);
+      g.lineWidth = 2.8 - r * 0.8;
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  g.translate(x, y);
+  const s = scale * (1 - 0.14 * clickPulse);
+  g.scale(s, s);
+  g.shadowColor = 'rgba(2, 6, 18, 0.68)';
+  g.shadowBlur = 12;
+  g.shadowOffsetY = 4;
+  g.fillStyle = '#FFFFFF';
+  g.strokeStyle = '#0F172A';
+  g.lineWidth = 2.2;
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(0, 25);
+  g.lineTo(6.8, 19.2);
+  g.lineTo(11.8, 29);
+  g.lineTo(16.2, 26.8);
+  g.lineTo(11.0, 17.0);
+  g.lineTo(19.0, 17.0);
+  g.closePath();
+  g.fill();
+  g.stroke();
+  g.restore();
+}
+
+// ------------------------------------------------------------------ 7. Live Website Interactive Tour & Camera Focus State Machine (Ch 1 .. Ch 6)
+function getTourStageState(tReal) {
+  const ch = getChapterIndex(tReal);
+  const [r0, r1] = TL.chapters[ch] || [14.313, 29.286];
+  const u = clamp((tReal - r0) / Math.max(0.1, r1 - r0));
+
+  // Default state
+  let url = 'https://ans.cauai.fun/explore';
+  let statusBadge = 'LIVE BROWSING · 项目广场';
+  let statusColor = '#9BE0C5';
+  let img = ASSETS.exploreAll;
+  let prevImg = null;
+  let fade = 1.0;
+  let scrollY = 0;
+  let zoom = 1.0;
+  let focusX = 960;
+  let focusY = 540;
+  let curX = 960;
+  let curY = 420;
+  let clickPulse = 0;
+  let whipPulse = 0;
+  let snackPulse = 0;
+  let snackLabel = '';
+  let calloutTitle = '';
+  let calloutSub = '';
+  let calloutAccent = '#9BE0C5';
+
+  // CHAPTER 1 (14.31s .. 29.29s): /explore Category Switching & Smooth Vertical Scrolling
+  if (ch === 1) {
+    url = 'https://ans.cauai.fun/explore';
+    if (u < 0.46) {
+      // Clause 2: Browse & scroll down /explore all star open-source projects
+      const s = u / 0.46;
+      img = ASSETS.exploreAll;
+      statusBadge = '项目广场 · 开源宝藏与精选实战';
+      // Scroll down 0 -> 440px then back up to 0px for category clicking
+      scrollY = s < 0.72 ? lerp(0, 440, eInOutCubic(s / 0.72)) : lerp(440, 0, eInOutCubic((s - 0.72) / 0.28));
+      zoom = s < 0.72 ? lerp(1.04, 1.24, eInOutCubic(s / 0.72)) : lerp(1.24, 1.46, eInOutCubic((s - 0.72) / 0.28));
+      focusX = s < 0.72 ? lerp(960, 860, Math.sin(s * Math.PI)) : lerp(860, 560, eInOutCubic((s - 0.72) / 0.28));
+      focusY = s < 0.72 ? lerp(520, 620, Math.sin(s * Math.PI)) : lerp(620, 260, eInOutCubic((s - 0.72) / 0.28));
+      curX = s < 0.72 ? lerp(640, 980, eInOutCubic(s / 0.72)) : lerp(980, 446, eInOutCubic((s - 0.72) / 0.28));
+      curY = s < 0.72 ? lerp(480, 580, Math.sin(s * Math.PI)) : lerp(580, 222, eInOutCubic((s - 0.72) / 0.28));
+      calloutTitle = '🌟 全网高星开源宝藏 · 零门槛直达';
+      calloutSub = 'Hello 算法 · Build Your Own X · freeCodeCamp · ComfyUI · Video2X';
+    } else if (u < 0.65) {
+      // Switch to 学习成长 10 & scroll down
+      const s = (u - 0.46) / 0.19;
+      prevImg = ASSETS.exploreAll;
+      img = ASSETS.exploreLearn;
+      fade = clamp(s / 0.18);
+      statusBadge = '切换分类 · 学习成长 (10)';
+      statusColor = '#9BE0C5';
+      clickPulse = Math.exp(-Math.pow((s - 0.06) / 0.08, 2));
+      scrollY = s < 0.22 ? 0 : lerp(0, 380, eInOutCubic((s - 0.22) / 0.78));
+      zoom = s < 0.28 ? 1.46 : lerp(1.46, 1.22, eInOutCubic((s - 0.28) / 0.72));
+      focusX = lerp(480, 920, eInOutCubic(s));
+      focusY = s < 0.25 ? 250 : lerp(250, 580, eInOutCubic((s - 0.25) / 0.75));
+      curX = s < 0.25 ? 446 : lerp(446, 986, eInOutCubic((s - 0.25) / 0.75));
+      curY = s < 0.25 ? 222 : lerp(222, 420, Math.sin(s * Math.PI));
+      calloutTitle = '📚 分类切换 #1 · 学习成长';
+      calloutSub = 'Hello 算法 · Build Your Own X · The Algorithms Python · Markmap';
+    } else if (u < 0.83) {
+      // Switch to GitHub 宝藏 7 & scroll down
+      const s = (u - 0.65) / 0.18;
+      prevImg = ASSETS.exploreLearn;
+      img = ASSETS.exploreGithub;
+      fade = clamp(s / 0.18);
+      statusBadge = '切换分类 · GitHub 宝藏 (7)';
+      statusColor = '#38BDF8';
+      clickPulse = Math.exp(-Math.pow((s - 0.06) / 0.08, 2));
+      scrollY = s < 0.22 ? 0 : lerp(0, 340, eInOutCubic((s - 0.22) / 0.78));
+      zoom = s < 0.25 ? lerp(1.22, 1.44, s / 0.25) : lerp(1.44, 1.22, eInOutCubic((s - 0.25) / 0.75));
+      focusX = lerp(986, 960, eInOutCubic(s));
+      focusY = s < 0.25 ? 250 : lerp(250, 560, eInOutCubic((s - 0.25) / 0.75));
+      curX = s < 0.25 ? 986 : lerp(986, 1236, eInOutCubic((s - 0.25) / 0.75));
+      curY = s < 0.25 ? 222 : lerp(222, 410, Math.sin(s * Math.PI));
+      calloutTitle = '💎 分类切换 #2 · GitHub 宝藏';
+      calloutSub = 'Ollama 本地模型 · Code2Prompt · 微软 AI Agent 入门 · Hermes Agent';
+      calloutAccent = '#38BDF8';
+    } else {
+      // Switch to 效率与生活 8 & scroll down
+      const s = (u - 0.83) / 0.17;
+      prevImg = ASSETS.exploreGithub;
+      img = ASSETS.exploreProd;
+      fade = clamp(s / 0.18);
+      statusBadge = '切换分类 · 效率与生活 (8)';
+      statusColor = '#FDE68A';
+      clickPulse = Math.exp(-Math.pow((s - 0.06) / 0.08, 2));
+      scrollY = s < 0.22 ? 0 : lerp(0, 380, eInOutCubic((s - 0.22) / 0.78));
+      zoom = s < 0.25 ? 1.42 : lerp(1.42, 1.16, eInOutCubic((s - 0.25) / 0.75));
+      focusX = lerp(1200, 960, eInOutCubic(s));
+      focusY = s < 0.25 ? 250 : lerp(250, 560, eInOutCubic((s - 0.25) / 0.75));
+      curX = s < 0.25 ? 1236 : lerp(1236, 960, eInOutCubic((s - 0.25) / 0.75));
+      curY = s < 0.25 ? 222 : lerp(222, 520, eInOutCubic((s - 0.25) / 0.75));
+      calloutTitle = '⚡ 分类切换 #3 · 效率与生活';
+      calloutSub = 'AppFlowy 协作空间 · AFFiNE 文档白板 · Memos · Stirling PDF';
+      calloutAccent = '#FDE68A';
+    }
+  }
+  // CHAPTER 2 (29.29s .. 43.53s): VibeHub (/vibe-hub) Visual Glossary Scrolling & Courses/Practice
+  else if (ch === 2) {
+    url = 'https://ans.cauai.fun/vibe-hub';
+    if (u < 0.22) {
+      // Browse AI 54 & 前端 146, then click 设计风格 24
+      const s = u / 0.22;
+      img = s < 0.55 ? ASSETS.vibehubAi : ASSETS.vibehubFe;
+      prevImg = s < 0.55 ? null : ASSETS.vibehubAi;
+      fade = s < 0.55 ? 1 : clamp((s - 0.55) / 0.18);
+      statusBadge = s < 0.55 ? 'VibeHub · AI 核心术语 (54)' : 'VibeHub · 前端工程术语 (146)';
+      scrollY = lerp(0, 220, Math.sin(s * Math.PI));
+      zoom = lerp(1.12, 1.45, eInOutCubic(s));
+      focusX = lerp(520, 760, eInOutCubic(s));
+      focusY = lerp(340, 210, eInOutCubic(s));
+      curX = lerp(380, 901, eInOutCubic(s));
+      curY = lerp(240, 152, eInOutCubic(s));
+      clickPulse = Math.exp(-Math.pow((s - 0.55) / 0.09, 2));
+      calloutTitle = '📖 VibeHub 术语图鉴 · 200+ 词条全收录';
+      calloutSub = 'AI 54 · 前端 146 · 后端 73 · 产品 25 · 设计风格 24';
+    } else if (u < 0.76) {
+      // Click 设计风格 24 & smoothly scroll down through Apple HIG, Bento Grid, Glassmorphism, Swiss Style
+      const s = (u - 0.22) / 0.54;
+      prevImg = ASSETS.vibehubFe;
+      img = ASSETS.vibehubStyle;
+      fade = clamp(s / 0.10);
+      statusBadge = 'VibeHub · 设计风格图鉴 (24 个真实界面范例)';
+      statusColor = '#9BE0C5';
+      clickPulse = Math.exp(-Math.pow((s - 0.03) / 0.05, 2));
+      scrollY = s < 0.12 ? 0 : lerp(0, 680, eInOutCubic((s - 0.12) / 0.88));
+      zoom = s < 0.15 ? lerp(1.45, 1.34, s / 0.15) : lerp(1.34, 1.24, Math.sin(s * Math.PI));
+      // Pan across left -> center -> right columns as it scrolls down!
+      focusX = 960 + Math.sin(s * TAU) * 190;
+      focusY = lerp(360, 660, eInOutCubic(s));
+      curX = 960 + Math.sin(s * TAU) * 260;
+      curY = lerp(320, 560, eInOutCubic(s));
+      calloutTitle = '🎨 24 种主流 UI 设计风格 · 1:1 真实界面范例';
+      calloutSub = '现代简约 · 苹果风 Apple HIG · Notion 风 · Bento 便当格 · 玻璃拟态 · 瑞士排版';
+    } else {
+      // Switch to 课程 & 练习 tabs at top
+      const s = (u - 0.76) / 0.24;
+      img = s < 0.52 ? ASSETS.vibehubCourses : ASSETS.vibehubPractice;
+      prevImg = s < 0.52 ? ASSETS.vibehubStyle : ASSETS.vibehubCourses;
+      fade = s < 0.52 ? clamp(s / 0.20) : clamp((s - 0.52) / 0.20);
+      statusBadge = s < 0.52 ? 'VibeHub · 系统实战课程' : 'VibeHub · 交互式闯关练习';
+      statusColor = '#38BDF8';
+      scrollY = 0;
+      zoom = lerp(1.20, 1.32, Math.sin(s * Math.PI));
+      focusX = lerp(740, 880, eInOutCubic(s));
+      focusY = lerp(240, 420, eInOutCubic(s));
+      curX = s < 0.52 ? 753 : 821;
+      curY = s < 0.25 ? 24 : lerp(24, 380, eInOutCubic(s));
+      clickPulse = Math.exp(-Math.pow((s - 0.06) / 0.08, 2)) + Math.exp(-Math.pow((s - 0.55) / 0.08, 2));
+      calloutTitle = '🛠️ 课程 + 练习闭环 · 边看图鉴边动手';
+      calloutSub = '从看懂设计风格与技术术语，到亲手跑通第一个 AI Web 项目';
+      calloutAccent = '#38BDF8';
+    }
+  }
+  // CHAPTER 3 (43.53s .. 58.17s): Pre-Cached 3D Dino Agent Part 1 (Click 3 Times to Zoom + Whip 3 Times!)
+  else if (ch === 3) {
+    url = 'https://ans.cauai.fun · 3D 小恐龙 Agent (小薄荷 Minty)';
+    if (u < 0.44) {
+      // Clause 6: Zoom into bottom-right 3D Dino Agent & click 3 times (dino_00 -> dino_05)
+      const s = u / 0.44;
+      // Click 1 at s=0.32, Click 2 at s=0.52, Click 3 at s=0.72
+      let dIdx = 0;
+      if (s >= 0.72) {
+        const k = clamp((s - 0.72) / 0.28);
+        dIdx = Math.min(5, 3 + Math.floor(k * 2.99));
+      } else if (s >= 0.52) {
+        dIdx = 2;
+      } else if (s >= 0.32) {
+        dIdx = 1;
+      }
+      img = ASSETS[`dino_${String(dIdx).padStart(2, '0')}`] || ASSETS.dino_00;
+      clickPulse = Math.exp(-Math.pow((s - 0.32) / 0.045, 2)) +
+                   Math.exp(-Math.pow((s - 0.52) / 0.045, 2)) +
+                   Math.exp(-Math.pow((s - 0.72) / 0.055, 2));
+
+      if (s < 0.74) {
+        // Zoomed into bottom-right corner where the 3D Dino bubble lives!
+        const zIn = eInOutCubic(clamp(s / 0.28));
+        zoom = lerp(1.06, 1.85, zIn);
+        focusX = lerp(960, 1620, zIn);
+        focusY = lerp(540, 820, zIn);
+        curX = lerp(1280, 1838, zIn);
+        curY = lerp(680, 932, zIn);
+        const clickCount = s >= 0.52 ? 2 : (s >= 0.32 ? 1 : 0);
+        statusBadge = `右下角 3D Agent · 连点三下 (${clickCount}/3)`;
+        calloutTitle = `🦖 右下角专属 3D 小恐龙 Agent · 连点 3 下召唤`;
+        calloutSub = '已预缓存 Three.js 骨骼动画 · 点击 3 次立即切入近景互动台';
+      } else {
+        // Smoothly pan from bottom-right to the Center Close-Up Macro Stage!
+        const pM = eInOutCubic((s - 0.74) / 0.26);
+        zoom = lerp(1.85, 1.46, pM);
+        focusX = lerp(1620, 960, pM);
+        focusY = lerp(820, 710, pM);
+        curX = lerp(1838, 812, pM);
+        curY = lerp(932, 911, pM);
+        statusBadge = '✨ 近景互动台已就绪 · 小薄荷 Minty (3/3)';
+        calloutTitle = '🎬 贴脸杀！已放大进入灵龙近景互动台';
+        calloutSub = '支持挥鞭催干活 · 盲盒投喂零食 · 3D 衣橱一键换装';
+      }
+    } else {
+      // Clause 7: Whip 3 times! (dino_06 .. dino_17)
+      const s = (u - 0.44) / 0.56;
+      const dIdx = Math.min(17, 6 + Math.floor(s * 11.99));
+      img = ASSETS[`dino_${String(dIdx).padStart(2, '0')}`] || ASSETS.dino_07;
+      // 3 whip strikes at s=0.12, s=0.45, s=0.78
+      const w1 = Math.exp(-Math.pow((s - 0.12) / 0.055, 2));
+      const w2 = Math.exp(-Math.pow((s - 0.45) / 0.055, 2));
+      const w3 = Math.exp(-Math.pow((s - 0.78) / 0.055, 2));
+      clickPulse = Math.max(w1, w2, w3);
+      whipPulse = Math.max(w1, w2, w3);
+
+      zoom = lerp(1.46, 1.56, Math.sin(s * Math.PI)) + 0.04 * whipPulse;
+      focusX = 960 + (whipPulse > 0.1 ? Math.sin(tReal * 45) * 6 * whipPulse : 0);
+      focusY = 710;
+      curX = 812;
+      curY = 911;
+      const whipCount = s >= 0.75 ? 3 : (s >= 0.42 ? 2 : 1);
+      statusBadge = `🪢 挥鞭催干活 ×${whipCount} · 打工魂彻底觉醒 (100% ⚡ 超频)`;
+      statusColor = '#FDE68A';
+      calloutTitle = `🪢 抽鞭子催干活 ×${whipCount} · 光速敲代码中`;
+      calloutSub = 'git push origin feat/ans-120fps ⚡ · 干活动力瞬间飙至 100% 超频状态';
+      calloutAccent = '#FDE68A';
+    }
+  }
+  // CHAPTER 4 (58.17s .. 73.24s): Pre-Cached 3D Dino Agent Part 2 (Feed Snacks 3 Times + 3D Wardrobe Outfit Change!)
+  else if (ch === 4) {
+    url = 'https://ans.cauai.fun · 3D 小恐龙投喂与 3D 衣橱';
+    if (u < 0.48) {
+      // Clause 8: Feed snacks 3 times! (dino_18 .. dino_24)
+      const s = u / 0.48;
+      const dIdx = Math.min(24, 18 + Math.floor(s * 6.99));
+      img = ASSETS[`dino_${String(dIdx).padStart(2, '0')}`] || ASSETS.dino_18;
+      const f1 = Math.exp(-Math.pow((s - 0.14) / 0.06, 2));
+      const f2 = Math.exp(-Math.pow((s - 0.46) / 0.06, 2));
+      const f3 = Math.exp(-Math.pow((s - 0.78) / 0.06, 2));
+      clickPulse = Math.max(f1, f2, f3);
+      snackPulse = Math.max(f1, f2, f3);
+      const snacks = [
+        '🌶️ 投喂 #1：三倍变态辣火鸡面 (+22 ♥ 好感度)',
+        '🧋 投喂 #2：多肉杨枝甘露波波冰 (+25 ⚡ 能量)',
+        '🔋 投喂 #3：4090 满血显卡饼干 (+30 灵感星豆)'
+      ];
+      snackLabel = s < 0.36 ? snacks[0] : (s < 0.68 ? snacks[1] : snacks[2]);
+
+      zoom = lerp(1.48, 1.54, Math.sin(s * Math.PI));
+      focusX = 960;
+      focusY = 700;
+      curX = s < 0.88 ? 916 : lerp(916, 1016, (s - 0.88) / 0.12);
+      curY = 911;
+      statusBadge = `🎲 盲盒投喂零食 · 能量与好感度拉满`;
+      statusColor = '#9BE0C5';
+      calloutTitle = snackLabel;
+      calloutSub = '盲盒投喂补充能量 · 灵感星豆与好感度持续飙升';
+    } else {
+      // Clause 9: Open 3D Wardrobe & switch outfits with 360° turntable spin! (dino_25 .. dino_35)
+      const s = (u - 0.48) / 0.52;
+      const dIdx = Math.min(35, 25 + Math.floor(s * 10.99));
+      img = ASSETS[`dino_${String(dIdx).padStart(2, '0')}`] || ASSETS.dino_28;
+      const cOpen = Math.exp(-Math.pow((s - 0.04) / 0.05, 2));
+      const cTripo = Math.exp(-Math.pow((s - 0.28) / 0.05, 2));
+      const cUR = Math.exp(-Math.pow((s - 0.64) / 0.05, 2));
+      clickPulse = Math.max(cOpen, cTripo, cUR);
+
+      zoom = lerp(1.48, 1.24, clamp(s / 0.22));
+      focusX = lerp(960, 1040, clamp(s / 0.22));
+      focusY = lerp(700, 560, clamp(s / 0.22));
+
+      if (s < 0.15) {
+        curX = lerp(1016, 1712, s / 0.15);
+        curY = lerp(911, 240, s / 0.15);
+      } else if (s < 0.52) {
+        curX = 1712;
+        curY = 240;
+      } else {
+        curX = lerp(1712, 1468, clamp((s - 0.52) / 0.12));
+        curY = lerp(240, 272, clamp((s - 0.52) / 0.12));
+      }
+
+      const isUR = dIdx >= 32;
+      statusBadge = isUR ? '👗 3D 衣橱 · 👑 一键 UR 满配神装 (360° 预览)' : '👗 3D 衣橱 · 🧋 Tripo 喷射套装 (SS 闪耀搭配师)';
+      statusColor = isUR ? '#FDE68A' : '#38BDF8';
+      calloutTitle = isUR ? '👑 已换装：一键 UR 满配神装 · 360° 旋转展示' : '🧋 已换装：Tripo 喷射套装 + 奶油云朵画家帽 + 金丝镜';
+      calloutSub = '支持头饰冠冕 · 潮酷面饰 · 背饰披风 · 手持法器 · 脚底星环自由搭配';
+      calloutAccent = isUR ? '#FDE68A' : '#38BDF8';
+    }
+  }
+  // CHAPTER 5 (73.24s .. 86.23s): Market (/market) — Publish Project, Traffic Boost & Trading Environment
+  else if (ch === 5) {
+    url = 'https://ans.cauai.fun/market';
+    img = ASSETS.marketClean;
+    if (u < 0.45) {
+      // Clause 10: Focus on "发布我的项目或服务" button & platform traffic boost
+      const s = u / 0.45;
+      zoom = lerp(1.12, 1.52, Math.sin(s * Math.PI));
+      focusX = lerp(960, 1340, Math.sin(s * Math.PI));
+      focusY = lerp(420, 260, Math.sin(s * Math.PI));
+      curX = lerp(1120, 1506, eOutCubic(clamp(s / 0.45)));
+      curY = lerp(360, 282, eOutCubic(clamp(s / 0.45)));
+      clickPulse = Math.exp(-Math.pow((s - 0.48) / 0.08, 2));
+      scrollY = 0;
+      statusBadge = 'ANS 市场 · 一键上架项目与平台推流';
+      statusColor = '#9BE0C5';
+      calloutTitle = '🚀 一键上架 ANS 市场 · 平台官方主动推流曝光';
+      calloutSub = '把你的工作流、Agent、Web 模板与定制服务上架市场，享受首页与分类流量扶持';
+    } else {
+      // Clause 11: Smoothly scroll down through clean Market listings & trading environment
+      const s = (u - 0.45) / 0.55;
+      scrollY = lerp(0, 560, eInOutCubic(s));
+      zoom = lerp(1.18, 1.32, Math.sin(s * Math.PI));
+      focusX = lerp(720, 1180, eInOutCubic(s));
+      focusY = lerp(480, 620, eInOutCubic(s));
+      curX = lerp(680, 1124, eInOutCubic(s));
+      curY = lerp(460, 540, Math.sin(s * Math.PI));
+      clickPulse = Math.exp(-Math.pow((s - 0.35) / 0.07, 2)) + Math.exp(-Math.pow((s - 0.75) / 0.07, 2));
+      statusBadge = 'ANS 市场 · 积分即秒发与 80% 创作者分润';
+      statusColor = '#FDE68A';
+      calloutTitle = '💎 完善积分结算与交易环境 · 支付即秒发';
+      calloutSub = 'Pi Agent 知识图谱 RAG (690 积分) · 智慧农业大屏 (590 积分) · SCI 精修台 (390 积分)';
+      calloutAccent = '#FDE68A';
+    }
+  }
+  // CHAPTER 6 (86.23s .. 108.76s): Community/Teams (/teams), Competitions (/competitions & AgriHackathon), and CAUHub (/hubs)
+  else if (ch === 6) {
+    if (u < 0.34) {
+      // Clause 12: /teams (交换需求 · 跨学科组队参赛 · 平台给算力)
+      const s = u / 0.34;
+      url = 'https://ans.cauai.fun/teams';
+      img = ASSETS.teamsClean;
+      scrollY = lerp(0, 220, eInOutCubic(s));
+      zoom = lerp(1.16, 1.42, Math.sin(s * Math.PI));
+      focusX = lerp(1180, 880, eInOutCubic(s));
+      focusY = lerp(310, 480, eInOutCubic(s));
+      curX = s < 0.35 ? 1500 : lerp(1500, 960, (s - 0.35) / 0.65);
+      curY = s < 0.35 ? 395 : lerp(395, 510, (s - 0.35) / 0.65);
+      clickPulse = Math.exp(-Math.pow((s - 0.25) / 0.08, 2));
+      statusBadge = '社区与团队 · 交换需求与跨学科组队';
+      statusColor = '#9BE0C5';
+      calloutTitle = '🤝 社区交换需求 · 1–5 人跨学科组队参赛 · 平台发算力';
+      calloutSub = '农学/植保 + 算法/后端 + 前端/AIGC 自由建队，共享专属赛事算力池';
+    } else if (u < 0.69) {
+      // Clause 13: /competitions -> /competitions/agrihackathon (黑客松 + AIGC 比赛 + 农客松大赛)
+      const s = (u - 0.34) / 0.35;
+      if (s < 0.32) {
+        url = 'https://ans.cauai.fun/competitions';
+        prevImg = ASSETS.teamsClean;
+        img = ASSETS.compMain;
+        fade = clamp(s / 0.16);
+        scrollY = 0;
+        zoom = lerp(1.16, 1.38, s / 0.32);
+        focusX = lerp(960, 740, s / 0.32);
+        focusY = 440;
+        curX = 412;
+        curY = 492;
+        clickPulse = Math.exp(-Math.pow((s - 0.24) / 0.06, 2));
+        statusBadge = '大赛专区 · 黑客松与 AIGC 赛事导航';
+        statusColor = '#38BDF8';
+      } else {
+        const k = (s - 0.32) / 0.68;
+        url = 'https://ans.cauai.fun/competitions/agrihackathon';
+        prevImg = ASSETS.compMain;
+        img = ASSETS.agriMain;
+        fade = clamp(k / 0.16);
+        scrollY = lerp(0, 480, eInOutCubic(k));
+        zoom = lerp(1.38, 1.24, k);
+        focusX = 960;
+        focusY = lerp(440, 620, k);
+        curX = lerp(412, 960, k);
+        curY = lerp(492, 580, k);
+        statusBadge = 'AgriHackathon | 首届中国农大 AI 创客马拉松 (农客松)';
+        statusColor = '#9BE0C5';
+      }
+      calloutTitle = '🏆 大赛专区 · 精选黑客松与 AIGC 大赛 · 重磅举办农客松';
+      calloutSub = '五步跑通参赛全流程：读规则选赛道 → 领算力搭原型 → Git 代码存证 → 作品墙拉票 → 终审榜';
+      calloutAccent = '#38BDF8';
+    } else {
+      // Clause 14: /hubs — 支持各高校 Hub 入驻 · 目前已入驻中国农业大学 CAU (CAUHub)
+      const s = (u - 0.69) / 0.31;
+      url = 'https://ans.cauai.fun/hubs';
+      prevImg = ASSETS.agriMain;
+      img = ASSETS.hubsMain;
+      fade = clamp(s / 0.15);
+      scrollY = 0;
+      // Zoom directly onto CAUHub card (left-top card at x=640, y=520 in hubs_main.webp)
+      zoom = lerp(1.12, 1.56, eOutCubic(clamp(s / 0.55)));
+      focusX = lerp(960, 650, eOutCubic(clamp(s / 0.55)));
+      focusY = lerp(520, 500, eOutCubic(clamp(s / 0.55)));
+      curX = lerp(960, 580, eOutCubic(clamp(s / 0.45)));
+      curY = lerp(540, 505, eOutCubic(clamp(s / 0.45)));
+      clickPulse = Math.exp(-Math.pow((s - 0.48) / 0.08, 2));
+      statusBadge = '🎓 高校 Hub 入驻 · 中国农业大学 CAUHub';
+      statusColor = '#FDE68A';
+      calloutTitle = '🎓 支持全国各高校 Hub 入驻 · 首站中国农业大学 CAUHub';
+      calloutSub = 'CAUHub（农大赛事、项目与创客交流） · ANS VibeHub · AIGC Hub · 全栈开发 Hub';
+      calloutAccent = '#FDE68A';
+    }
+  }
+
+  return {
+    ch, u, url, statusBadge, statusColor, img, prevImg, fade,
+    scrollY, zoom, focusX, focusY, curX, curY,
+    clickPulse, whipPulse, snackPulse, snackLabel,
+    calloutTitle, calloutSub, calloutAccent
+  };
+}
+
+// ------------------------------------------------------------------ 8. 3 Frosted-Glass Cards Setup & State Choreography
+const S = 2; // 2x supersampled UI texture inside each frosted glass card
+function makeCard(id, maxW, maxH) {
+  const cv = document.createElement('canvas');
+  cv.width = maxW * S;
+  cv.height = maxH * S;
+  return { id, maxW, maxH, w: maxW, h: maxH, cv, g: cv.getContext('2d'), tex: canvasTex(true) };
+}
+
+function prepareCardCanvas(card, st) {
+  const tw = Math.max(64, Math.round(st.w * S));
+  const th = Math.max(64, Math.round(st.h * S));
+  if (card.cv.width !== tw || card.cv.height !== th) {
+    card.cv.width = tw;
+    card.cv.height = th;
+  }
+  const g = card.g;
+  g.setTransform(S, 0, 0, S, 0, 0);
+  g.clearRect(0, 0, st.w, st.h);
+  const hdrGr = g.createLinearGradient(0, 0, 0, 118);
+  hdrGr.addColorStop(0, 'rgba(6, 10, 22, 0.38)');
+  hdrGr.addColorStop(0.65, 'rgba(6, 10, 22, 0.16)');
+  hdrGr.addColorStop(1, 'rgba(6, 10, 22, 0)');
+  g.fillStyle = hdrGr;
+  g.fillRect(0, 0, st.w, 118);
+  return g;
+}
+
+const CARDS = [
+  makeCard('L', 740, 560),
+  makeCard('M', 1420, 760),
+  makeCard('R', 740, 560),
+];
+
+function getCardState(idx, t, tReal) {
+  const ch = getChapterIndex(tReal);
+  const [r0, r1] = TL.chapters[ch] || [0, 14.3];
+  const local = tReal - r0;
+  const dur = Math.max(0.1, r1 - r0);
+
+  let x = 960, y = 570, z = 0, rx = 0, ry = 0, rz = 0;
+  let w = 520, h = 540, r = 36, op = 1, frost = 1.0, defocus = 0.5;
+  const flY = Math.sin(tReal * 1.45 + idx * 1.7) * 4.0;
+  const flRx = Math.cos(tReal * 1.10 + idx * 1.3) * 0.75;
+  const flRy = Math.sin(tReal * 0.92 + idx * 2.1) * 0.95;
+
+  // CHAPTER 0 (0.00s .. 14.31s): Pain Point (Clauses 0) -> Flip to Day 01 Three Real Things (Clause 1)
+  if (ch === 0) {
+    const in1 = seg(tReal, 0.0, 0.70, eOutBack);
+    const flipU = clamp((tReal - 6.15) / 0.85);
+    const flip = eInOutCubic(flipU);
+    const flipSwing = Math.sin(flipU * Math.PI);
+    const out1 = seg(tReal, r1 - 0.42, r1, eInOutCubic);
+
+    if (idx === 0) {
+      w = 450; h = 496; r = 34;
+      x = lerp(310, 315, flip) - 160 * (1 - in1) - 180 * out1;
+      y = lerp(555, 540, flip) + 30 * (1 - in1) + flY;
+      z = lerp(90, 80, flip) - 45 * flipSwing + 180 * out1;
+      rx = lerp(4, 2, flip) + 4 * flipSwing + flRx;
+      ry = lerp(16, 15, flip) + 22 * flipSwing + flRy;
+      defocus = lerp(0.8, 0.5, flip) + 4 * (1 - in1) + 6 * out1;
+      op = clamp(in1, 0, 1) * (1 - 0.85 * out1);
+    } else if (idx === 1) {
+      w = 700; h = 516; r = 38;
+      x = 960;
+      y = lerp(555, 536, flip) + 35 * (1 - in1) + flY * 0.7;
+      z = lerp(20, -15, flip) - 55 * flipSwing + 140 * out1;
+      rx = lerp(3, 1, flip) + 5 * flipSwing + flRx * 0.6;
+      ry = 18 * flipSwing + flRy * 0.6;
+      defocus = 0.5 + 3 * (1 - in1) + 5 * out1;
+      op = clamp(in1, 0, 1) * (1 - 0.85 * out1);
+    } else {
+      w = 450; h = 496; r = 34;
+      x = lerp(1610, 1605, flip) + 160 * (1 - in1) + 180 * out1;
+      y = lerp(555, 540, flip) + 30 * (1 - in1) + flY;
+      z = lerp(90, 80, flip) - 45 * flipSwing + 180 * out1;
+      rx = lerp(4, 2, flip) + 4 * flipSwing + flRx;
+      ry = lerp(-16, -15, flip) - 22 * flipSwing + flRy;
+      defocus = lerp(0.8, 0.5, flip) + 4 * (1 - in1) + 6 * out1;
+      op = clamp(in1, 0, 1) * (1 - 0.85 * out1);
+    }
+  }
+  // CHAPTERS 1 .. 6 (14.31s .. 108.76s): Widescreen Live Browser Studio in CARDS[1] + Floating Side HUD Cards in CARDS[0] & CARDS[2]
+  else if (ch >= 1 && ch <= 6) {
+    const inC = seg(local, 0.0, 0.62, eOutBack);
+    const outC = seg(local, dur - 0.36, dur, eInOutCubic);
+    const swing = Math.sin(clamp(local / 0.62) * Math.PI);
+
+    if (idx === 1) {
+      w = 1360; h = 736; r = 30;
+      x = 960;
+      y = 556 + 26 * (1 - inC) + flY * 0.45;
+      z = -28 - 35 * swing + 110 * (1 - inC) + 110 * outC;
+      rx = 0.6 + 2.5 * swing + flRx * 0.35;
+      ry = -6 * swing + flRy * 0.35;
+      op = clamp(inC, 0, 1) * (1 - 0.45 * outC);
+      defocus = 0.4 + 3 * Math.max(0, 1 - inC) + 3 * outC;
+    } else if (idx === 0) {
+      w = 224; h = 460; r = 26;
+      x = 142 - 90 * (1 - inC) - 90 * outC;
+      y = 556 + flY;
+      z = 45;
+      rx = 2 + flRx;
+      ry = 16 + flRy;
+      op = clamp(inC, 0, 1) * (1 - outC) * 0.94;
+      defocus = 0.6;
+    } else {
+      w = 224; h = 460; r = 26;
+      x = 1778 + 90 * (1 - inC) + 90 * outC;
+      y = 556 + flY;
+      z = 45;
+      rx = 2 + flRx;
+      ry = -16 + flRy;
+      op = clamp(inC, 0, 1) * (1 - outC) * 0.94;
+      defocus = 0.6;
+    }
+  }
+  // CHAPTER 7 (108.76s .. 121.96s): 28-Day Flag Dual Cards (Clause 15) -> Morph Curtain Parting into Giant "ANS" Finale (Clause 16)
+  else {
+    const in4 = seg(t, 11.50, 12.10, eOutBack);
+    const part = seg(t, 12.95, 13.75, eInOutCubic);
+    if (idx === 0) {
+      w = 740; h = 528; r = 38;
+      x = 545 - 240 * (1 - in4) - 720 * part;
+      y = 565 + 40 * (1 - in4) + flY;
+      z = 15 + 180 * (1 - in4) - 360 * part;
+      rx = 2 + flRx + 6 * part;
+      ry = 8 + flRy + 16 * part;
+      op = clamp(in4, 0, 1) * (1 - seg(t, 13.30, 13.70));
+      defocus = 0.5 + 14 * part;
+    } else if (idx === 2) {
+      w = 740; h = 528; r = 38;
+      x = 1375 + 240 * (1 - in4) + 720 * part;
+      y = 565 + 40 * (1 - in4) + flY;
+      z = 15 + 180 * (1 - in4) - 360 * part;
+      rx = 2 + flRx + 6 * part;
+      ry = -8 + flRy - 16 * part;
+      op = clamp(in4, 0, 1) * (1 - seg(t, 13.30, 13.70));
+      defocus = 0.5 + 14 * part;
+    } else {
+      op = 0;
+    }
+  }
+
+  const R = rotM(rx, ry, rz);
+  const sheen = -0.65 + 1.3 * ((tReal * 0.16 + idx * 0.31) % 1) + ry * 0.035;
+  const glintPhase = (tReal * 0.32 + idx * 0.27) % 1;
+  const glint = [lerp(-1.8, 1.8, glintPhase), 0.14 * Math.sin(glintPhase * Math.PI)];
+  return {
+    C: [x, y, z], ...R, half: [w / 2, h / 2], w, h, r,
+    op: clamp(op, 0, 1), contentA: 1.0, lod: 0.25 * Math.max(0, defocus - 0.5),
+    frost, defocus, sheen, glint, edge: 1.25,
+    catchL: [Math.sin(tReal * 1.6 + idx) * 0.4, 0.08]
+  };
+}
+
+// ------------------------------------------------------------------ 9. Draw Content of Each Translucent Frosted-Glass Card
+
+// Side HUD Card Renderer for Chapters 1..6
+function drawSideHudCard(g, w, h, side, tour, tReal) {
+  const isLeft = side === 'L';
+  const ch = tour.ch;
+
+  const leftConfigs = {
+    1: ['EXPLORE', '项目广场', ['全部精选 66+', '学习成长 10', 'GitHub 宝藏 7', '效率与生活 8', '比赛与团队 8'], '#9BE0C5'],
+    2: ['VIBEHUB', '术语与实战', ['AI 核心词条 54', '前端工程 146', '设计风格 24', '系统实战课程', '闯关式练习'], '#38BDF8'],
+    3: ['3D AGENT', '灵龙互动台', ['右下角常驻伴侣', '连点 3 下放大', '近景贴脸互动', '挥鞭催干活', '光速敲代码'], '#FDE68A'],
+    4: ['WARDROBE', '投喂与衣橱', ['盲盒零食投喂', '好感度+能量拉满', '3D 换装衣橱', 'Tripo 喷射套装', 'UR 满配神装'], '#9BE0C5'],
+    5: ['MARKET', '创作者市场', ['一键发布项目', '官方流量池推流', '完善交易环境', '积分即买即发', '80% 创作者分润'], '#FDE68A'],
+    6: ['ECOSYSTEM', '社群·大赛·Hub', ['社区交换需求', '跨学科组队领算力', '黑客松 & AIGC 赛', '农客松主会场', '中国农大 CAUHub'], '#38BDF8'],
+  };
+  const rightConfigs = {
+    1: ['STAR REPOS', '高星开源直跑', ['Hello 算法', 'Build Your Own X', 'Ollama 本地模型', 'Hermes Agent', 'AppFlowy & AFFiNE'], '#9BE0C5'],
+    2: ['24 STYLES', '真实风格范例', ['现代简约 Minimal', '苹果风 Apple HIG', 'Bento 便当格', '玻璃拟态 Glass', '瑞士排版 Swiss'], '#9BE0C5'],
+    3: ['OVERCLOCK', '打工魂觉醒', ['动力飙升 100%', '超频敲代码状态', 'git push feat', '实时语音气泡', 'Three.js 物理反馈'], '#FDE68A'],
+    4: ['360° SPIN', '高定穿搭评定', ['奶油云朵画家帽', '吨吨冰美式喷射包', '零 Bug 祈愿仙女棒', 'ANS 极光星神王冠', '360° 自由旋转'], '#38BDF8'],
+    5: ['MONETIZE', '热门上架作品', ['Pi Agent 知识图谱', '智慧农业监测大屏', '农学 SCI 精修台', 'ANOVA 科研绘图包', '组会周报自动汇总'], '#9BE0C5'],
+    6: ['CAUHUB', '高校 Hub 标杆', ['首站入驻：中国农大', '农大专属赛事通道', '跨院系创客组队', 'Git 源码存证墙', '支持全国高校入驻'], '#FDE68A'],
+  };
+
+  const [tag, title, items, col] = (isLeft ? leftConfigs : rightConfigs)[ch] || leftConfigs[1];
+
+  drawGlassChip(g, 16, 18, w - 32, 28, tag, {
+    bg: 'rgba(6, 12, 24, 0.72)', stroke: col, color: col, font: `700 11px ${F_MONO}`
+  });
+
+  g.font = `700 20px ${F_UI}`;
+  g.fillStyle = WHITE(0.99);
+  g.textAlign = 'center';
+  g.fillText(title, w / 2, 76);
+  g.textAlign = 'left';
+
+  items.forEach((it, i) => {
+    const iy = 98 + i * 52;
+    const activeIdx = Math.floor(tour.u * items.length);
+    const isAct = i === activeIdx;
+    rr(g, 14, iy, w - 28, 42, 12);
+    g.fillStyle = isAct ? 'rgba(155, 224, 197, 0.18)' : 'rgba(8, 14, 26, 0.56)';
+    g.fill();
+    g.strokeStyle = isAct ? col : 'rgba(255, 255, 255, 0.18)';
+    g.lineWidth = isAct ? 1.5 : 1.0;
+    g.stroke();
+
+    g.font = `${isAct ? 700 : 500} 12.5px ${F_UI}`;
+    g.fillStyle = isAct ? col : WHITE(0.86);
+    g.fillText(`${isAct ? '● ' : '· '}${it}`, 24, iy + 25);
+  });
+
+  // Bottom mini mascot or live telemetry sparkline
+  rr(g, 14, 366, w - 28, 76, 16);
+  g.fillStyle = 'rgba(8, 16, 28, 0.62)';
+  g.fill();
+  g.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+  g.lineWidth = 1;
+  g.stroke();
+
+  if (isLeft) {
+    drawLiveSparkline(g, 26, 382, w - 52, 28, tReal, col, ch * 1.1);
+    g.font = `600 11px ${F_MONO}`;
+    g.fillStyle = WHITE(0.80);
+    g.textAlign = 'center';
+    g.fillText('ans.cauai.fun · 60fps', w / 2, 428);
+    g.textAlign = 'left';
+  } else {
+    drawMascot(g, 50, 404, 52, tReal, { bobAmp: 2.0 });
+    g.font = `700 12px ${F_UI}`;
+    g.fillStyle = col;
+    g.fillText('AI Never Stops', 82, 398);
+    g.font = `500 11px ${F_UI}`;
+    g.fillStyle = WHITE(0.82);
+    g.fillText('真实网页实机导览', 82, 418);
+  }
+}
+
+// Center Widescreen Live Browser Studio Renderer (CARDS[1] in Chapters 1..6)
+function drawLiveBrowserWindow(g, w, h, tour, tReal) {
+  const barH = 44;
+  const vpW = w - 20;
+  const vpH = h - barH - 14;
+  const vpX = 10;
+  const vpY = barH + 4;
+
+  // 1. Top Browser Chrome Bar
+  rr(g, 10, 6, vpW, barH - 4, 16);
+  g.fillStyle = 'rgba(8, 13, 24, 0.92)';
+  g.fill();
+  g.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+  g.lineWidth = 1;
+  g.stroke();
+
+  // macOS traffic lights
+  ['#FF5F56', '#FFBD2E', '#27C93F'].forEach((c, i) => {
+    g.fillStyle = c;
+    g.beginPath();
+    g.arc(32 + i * 16, 26, 5.2, 0, TAU);
+    g.fill();
+  });
+
+  // Official ANS Triangle Monogram + URL Address Bar
+  drawAnsLogo(g, 96, 26, 18, 'mint');
+  rr(g, 118, 12, 490, 28, 14);
+  g.fillStyle = 'rgba(16, 24, 42, 0.88)';
+  g.fill();
+  g.strokeStyle = 'rgba(155, 224, 197, 0.38)';
+  g.lineWidth = 1;
+  g.stroke();
+
+  g.font = `600 12.5px ${F_MONO}`;
+  g.fillStyle = '#9BE0C5';
+  g.textBaseline = 'middle';
+  g.textAlign = 'left';
+  g.fillText(`🔒 ${tour.url}`, 134, 26.5);
+
+  // Right Live Action Status Badge
+  g.font = `700 12px ${F_UI}`;
+  const sbW = g.measureText(tour.statusBadge).width + 32;
+  rr(g, w - sbW - 22, 12, sbW, 28, 14);
+  g.fillStyle = 'rgba(10, 24, 32, 0.88)';
+  g.fill();
+  g.strokeStyle = tour.statusColor;
+  g.lineWidth = 1.2;
+  g.stroke();
+  g.fillStyle = tour.statusColor;
+  g.textAlign = 'center';
+  g.fillText(tour.statusBadge, w - sbW / 2 - 22, 26.5);
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+
+  // 2. Main Browser Viewport with Optical Camera Zoom & Pan (Screen Studio Style!)
+  g.save();
+  rr(g, vpX, vpY, vpW, vpH, 20);
+  g.clip();
+
+  g.fillStyle = '#F8FAFC';
+  g.fillRect(vpX, vpY, vpW, vpH);
+
+  // Base mapping from 1920x1080 source page coordinates -> (vpW x vpH) viewport
+  const baseScale = vpW / 1920;
+  const pageVisH = vpH / baseScale; // ~975px of vertical page height visible at 1.0x zoom
+
+  const zoom = tour.zoom || 1.0;
+  const fx = clamp(tour.focusX || 960, 960 / zoom, 1920 - 960 / zoom);
+  const fy = clamp(tour.focusY || (pageVisH / 2), (pageVisH / 2) / zoom, 1080 - (pageVisH / 2) / zoom);
+
+  g.save();
+  // Transform so page coordinate (fx, fy) is centered in the viewport and scaled by zoom * baseScale
+  g.translate(vpX + vpW / 2, vpY + vpH / 2);
+  g.scale(baseScale * zoom, baseScale * zoom);
+  g.translate(-fx, -fy);
+
+  const drawPageSheet = (sheetImg, scrollOffset) => {
+    if (!sheetImg) return;
+    const sw = sheetImg.width || 1920;
+    const sh = sheetImg.height || 1080;
+    const stickyH = scrollOffset > 2 ? 64 : 0;
+    // Draw scrolling body
+    const sy = clamp(scrollOffset, 0, Math.max(0, sh - 1080));
+    const drawH = Math.min(sh - sy, 1080);
+    g.drawImage(sheetImg, 0, sy, sw, drawH, 0, 0, 1920, drawH);
+    // Keep top website navbar (y=0..64) pinned when scrolling!
+    if (stickyH > 0) {
+      g.save();
+      g.shadowColor = 'rgba(15, 23, 42, 0.14)';
+      g.shadowBlur = 12;
+      g.shadowOffsetY = 4;
+      g.drawImage(sheetImg, 0, 0, sw, stickyH, 0, 0, 1920, stickyH);
+      g.restore();
+    }
+  };
+
+  if (tour.prevImg && tour.fade < 0.999) {
+    drawPageSheet(tour.prevImg, 0);
+    g.save();
+    g.globalAlpha = clamp(tour.fade, 0, 1);
+    drawPageSheet(tour.img, tour.scrollY || 0);
+    g.restore();
+  } else {
+    drawPageSheet(tour.img, tour.scrollY || 0);
+  }
+
+  // Draw Whip Slash FX in Chapter 3 when whipping the 3D Dino!
+  if (tour.whipPulse > 0.02) {
+    const wp = tour.whipPulse;
+    g.save();
+    g.globalAlpha = wp;
+    const grad = g.createLinearGradient(780, 480, 1140, 760);
+    grad.addColorStop(0, 'rgba(253, 230, 138, 0)');
+    grad.addColorStop(0.5, '#FDE68A');
+    grad.addColorStop(1, '#F87171');
+    g.strokeStyle = grad;
+    g.lineWidth = 8 * wp;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(810, 520);
+    g.quadraticCurveTo(960, 610, 1110, 720);
+    g.stroke();
+
+    // Floating whip pop badge
+    rr(g, 1050, 540 - (1 - wp) * 24, 210, 38, 19);
+    g.fillStyle = 'rgba(220, 38, 38, 0.92)';
+    g.fill();
+    g.strokeStyle = '#FDE68A';
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.font = `700 15px ${F_UI}`;
+    g.fillStyle = '#FFFFFF';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('🪢 啪！动力 +15% ⚡', 1155, 559 - (1 - wp) * 24);
+    g.restore();
+  }
+
+  // Draw Floating Snack Pop in Chapter 4 when feeding the 3D Dino!
+  if (tour.snackPulse > 0.02) {
+    const sp = tour.snackPulse;
+    g.save();
+    g.globalAlpha = sp;
+    rr(g, 1040, 555 - (1 - sp) * 28, 250, 40, 20);
+    g.fillStyle = 'rgba(6, 28, 24, 0.92)';
+    g.fill();
+    g.strokeStyle = '#9BE0C5';
+    g.lineWidth = 1.6;
+    g.stroke();
+    g.font = `700 15px ${F_UI}`;
+    g.fillStyle = '#9BE0C5';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('🎲 投喂成功！好感度 +22 ♥', 1165, 575 - (1 - sp) * 28);
+    g.restore();
+  }
+
+  // Draw Animated Pointer Cursor & Click Ripple in Page Coordinates
+  drawPointerCursor(g, tour.curX, tour.curY, 1.35 / Math.sqrt(zoom), tour.clickPulse, tour.statusColor);
+
+  g.restore(); // end zoom/pan transform
+
+  // 3. Floating Translucent Callout Banner (Top-left during 3D Dino Ch 3 & 4 so bottom buttons are 100% unobstructed)
+  if (tour.calloutTitle) {
+    const isTopCallout = (tour.ch === 3 || tour.ch === 4);
+    const cbW = isTopCallout ? Math.min(vpW - 48, 740) : Math.min(vpW - 48, 880);
+    const cbH = 60;
+    const cbX = isTopCallout ? (vpX + 16) : (vpX + (vpW - cbW) / 2);
+    const cbY = isTopCallout ? (vpY + 14) : (vpY + vpH - cbH - 14);
+
+    g.save();
+    g.shadowColor = 'rgba(2, 6, 18, 0.65)';
+    g.shadowBlur = 20;
+    g.shadowOffsetY = 6;
+    rr(g, cbX, cbY, cbW, cbH, 20);
+    g.fillStyle = 'rgba(6, 12, 24, 0.88)';
+    g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = tour.calloutAccent || '#9BE0C5';
+    g.lineWidth = 1.5;
+    g.stroke();
+
+    drawAnsLogo(g, cbX + 30, cbY + cbH / 2, 24, 'mint');
+    g.font = `700 16px ${F_UI}`;
+    g.fillStyle = tour.calloutAccent || '#9BE0C5';
+    g.textAlign = 'left';
+    g.fillText(tour.calloutTitle, cbX + 54, cbY + 26);
+
+    g.font = `500 13px ${F_UI}`;
+    g.fillStyle = WHITE(0.92);
+    g.fillText(tour.calloutSub, cbX + 54, cbY + 48);
+
+    // Zoom telemetry badge on right of callout banner
+    const zmTxt = `FOCUS ${zoom.toFixed(2)}x`;
+    rr(g, cbX + cbW - 114, cbY + 15, 98, 32, 16);
+    g.fillStyle = 'rgba(155, 224, 197, 0.14)';
+    g.fill();
+    g.strokeStyle = 'rgba(155, 224, 197, 0.42)';
+    g.lineWidth = 1;
+    g.stroke();
+    g.font = `700 11.5px ${F_MONO}`;
+    g.fillStyle = '#9BE0C5';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(zmTxt, cbX + cbW - 65, cbY + 31);
+    g.restore();
+  }
+
+  g.restore(); // end viewport clip
+
+  // Crisp viewport border
+  rr(g, vpX, vpY, vpW, vpH, 20);
+  g.strokeStyle = 'rgba(155, 224, 197, 0.42)';
+  g.lineWidth = 1.4;
+  g.stroke();
+}
+
+// CARD 0 (LEFT)
+function drawCardL(card, t, st, tReal) {
+  const g = prepareCardCanvas(card, st);
+  const w = st.w, h = st.h;
+  const ch = getChapterIndex(tReal);
+
+  if (ch === 0) {
+    const flip = seg(tReal, 6.15, 7.00, eInOutCubic);
+    if (flip < 0.99) {
+      g.save();
+      g.globalAlpha = 1 - flip;
+      drawGlassChip(g, 24, 22, 260, 30, '90% 的人每天都在刷 AI  ·  痛点 #1', {
+        bg: 'rgba(20, 16, 10, 0.58)', stroke: 'rgba(251, 191, 36, 0.55)', color: '#FDE68A', font: `700 12px ${F_MONO}`, align: 'left', dotColor: '#FBBF24'
+      });
+      g.font = `700 22px ${F_UI}`;
+      g.fillStyle = WHITE(0.98);
+      g.fillText('手里只剩下一堆聊天记录', 24, 82);
+      g.font = `500 13.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.76);
+      g.fillText('停留在碎片问答里，关掉窗口依然没有一件自己的作品', 24, 106);
+
+      const chatItems = [
+        ['Session #418 · 昨晚 23:42', '“帮我写个 AI 玩法方案…”  →  聊完即忘 · 0 件成品'],
+        ['Session #419 · 凌晨 01:15', '“这个报错怎么配环境？”  →  折腾半宿直接放弃'],
+        ['Session #420 · 今天 10:08', '“现在哪个旗舰模型好用？”  →  到处找号切换繁琐'],
+      ];
+      chatItems.forEach(([title, sub], i) => {
+        const cy = 128 + i * 74;
+        rr(g, 24, cy, w - 48, 62, 16);
+        g.fillStyle = 'rgba(14, 18, 28, 0.58)'; g.fill();
+        g.strokeStyle = 'rgba(255, 255, 255, 0.20)'; g.lineWidth = 1; g.stroke();
+        g.font = `700 12.5px ${F_MONO}`;
+        g.fillStyle = '#FCA5A5';
+        g.fillText(title, 40, cy + 24);
+        g.font = `500 13px ${F_UI}`;
+        g.fillStyle = WHITE(0.86);
+        g.fillText(sub, 40, cy + 47);
+      });
+
+      drawRoundedImage(g, ASSETS.aiAgents, 24, 356, w - 48, 114, 16, {
+        badge: '0 件成品沉淀', badgeColor: '#FCA5A5',
+        captionTitle: '历史会话 99+ 条', captionSub: '从来没有真正跑通做出自己的作品', alpha: 0.78
+      });
+      g.restore();
+    }
+    if (flip > 0.01) {
+      g.save();
+      g.globalAlpha = flip;
+      drawGlassChip(g, 24, 22, 256, 30, 'Day 01 安排到位  ·  第一件事', {
+        bg: 'rgba(8, 16, 28, 0.56)', stroke: 'rgba(155, 224, 197, 0.55)', color: '#9BE0C5', font: `700 12px ${F_UI}`, align: 'left', dotColor: '#9BE0C5'
+      });
+      g.font = `700 22px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText('第一件，顶配模型直接爽玩', 24, 82);
+      g.font = `500 13.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.80);
+      g.fillText('一站体验当下最顶的旗舰模型，免折腾直接开聊开造', 24, 106);
+
+      const models = [
+        ['满血 GPT-6-Astra', '旗舰满血推理与全栈创作主力', '#9BE0C5'],
+        ['大肥鱼 v4.1-1017', '超强中文语感与高频实操利器', '#38BDF8'],
+        ['Opus 5.5 旗舰版', '深度审美与复杂工程任务天花板', '#FDE68A'],
+      ];
+      models.forEach(([name, desc, col], i) => {
+        const my = 124 + i * 56;
+        rr(g, 24, my, w - 48, 46, 14);
+        g.fillStyle = 'rgba(8, 18, 30, 0.56)'; g.fill();
+        g.strokeStyle = col; g.lineWidth = 1.2; g.stroke();
+        g.font = `700 14px ${F_UI}`;
+        g.fillStyle = col;
+        g.fillText(`● ${name}`, 38, my + 28);
+        g.font = `500 12px ${F_UI}`;
+        g.fillStyle = WHITE(0.88);
+        g.textAlign = 'right';
+        g.fillText(desc, w - 38, my + 28);
+        g.textAlign = 'left';
+      });
+
+      drawRoundedImage(g, ASSETS.hermesAgent, 24, 298, w - 48, 172, 16, {
+        chromeUrl: 'ans.cauai.fun/explore',
+        badge: 'FLAGSHIP MODELS', badgeColor: '#9BE0C5',
+        captionTitle: 'Hermes Agent · 顶配模型与多工具编排', captionSub: '满血旗舰随时丝滑切换'
+      });
+      g.restore();
+    }
+    return;
+  }
+
+  if (ch >= 1 && ch <= 6) {
+    const tour = getTourStageState(tReal);
+    drawSideHudCard(g, w, h, 'L', tour, tReal);
+    return;
+  }
+
+  // CHAPTER 7 Left Wide Card: Full Ecosystem & Day 01 Summary
+  {
+    drawGlassChip(g, 28, 22, 320, 32, 'Day 01 / 28  ·  ANS 全站核心亮点全览', {
+      bg: 'rgba(8, 16, 28, 0.58)', stroke: 'rgba(155, 224, 197, 0.55)', color: '#9BE0C5', font: `700 12.5px ${F_UI}`, align: 'left', dotColor: '#4ADE80'
+    });
+    drawGlassChip(g, w - 216, 22, 188, 32, 'https://ans.cauai.fun', {
+      bg: 'rgba(8, 16, 28, 0.58)', stroke: 'rgba(255, 255, 255, 0.30)', color: WHITE(0.95), font: `600 12px ${F_MONO}`
+    });
+
+    g.font = `700 24px ${F_UI}`;
+    g.fillStyle = WHITE(0.99);
+    g.fillText('从项目广场、VibeHub 到市场与高校 CAUHub：', 28, 84);
+
+    const cols = [
+      {
+        step: '广场 & Hub',
+        title: '开源宝藏与图鉴',
+        desc1: '项目广场多分类切换',
+        desc2: 'VibeHub 200+ 术语图鉴',
+        col: '#9BE0C5',
+        bg: 'rgba(10, 30, 32, 0.58)'
+      },
+      {
+        step: '3D Agent',
+        title: '小恐龙近景互动',
+        desc1: '连点3下放大 · 挥鞭催干活',
+        desc2: '盲盒投喂 · 3D 衣橱换装',
+        col: '#38BDF8',
+        bg: 'rgba(8, 20, 36, 0.54)'
+      },
+      {
+        step: '市场 & 赛事',
+        title: '推流交易与农客松',
+        desc1: '市场上架推流 · 组队参赛',
+        desc2: '农客松大赛 · 中国农大 CAUHub',
+        col: '#FDE68A',
+        bg: 'rgba(20, 22, 16, 0.54)'
+      },
+    ];
+    const cw = (w - 56 - 28) / 3;
+    cols.forEach((c, ci) => {
+      const cx = 28 + ci * (cw + 14), cy = 106, chH = 166;
+      rr(g, cx, cy, cw, chH, 22);
+      g.fillStyle = c.bg; g.fill();
+      g.strokeStyle = c.col;
+      g.lineWidth = 1.5;
+      g.stroke();
+
+      drawGlassChip(g, cx + 16, cy + 16, 98, 26, c.step, {
+        bg: 'rgba(6, 10, 20, 0.72)', stroke: c.col, color: c.col, font: `700 11.5px ${F_UI}`
+      });
+      drawLiveSparkline(g, cx + cw - 72, cy + 18, 54, 22, t, c.col, ci * 1.4);
+
+      g.font = `700 19px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText(c.title, cx + 16, cy + 76);
+
+      g.font = `600 13px ${F_UI}`;
+      g.fillStyle = c.col;
+      g.fillText(c.desc1, cx + 16, cy + 114);
+
+      g.font = `500 12.2px ${F_UI}`;
+      g.fillStyle = WHITE(0.84);
+      g.fillText(c.desc2, cx + 16, cy + 140);
+    });
+
+    drawRoundedImage(g, ASSETS.helloAlgo, 28, 290, 334, 210, 18, {
+      chromeUrl: 'ans.cauai.fun/explore',
+      badge: '开源宝藏直跑', badgeColor: '#9BE0C5',
+      captionTitle: 'Hello 算法 · Build Your Own X', captionSub: '全网高星开源项目与 VibeHub 图鉴'
+    });
+    drawRoundedImage(g, ASSETS.remotionVideo, 378, 290, w - 378 - 28, 210, 18, {
+      chromeUrl: 'ans.cauai.fun/hubs',
+      badge: 'CAUHub 已入驻', badgeColor: '#38BDF8',
+      captionTitle: '农客松大赛 × 中国农大 CAUHub', captionSub: '跨学科组队领算力 · 市场上架变现'
+    });
+  }
+}
+
+// CARD 1 (CENTER HERO / LIVE BROWSER STUDIO)
+function drawCardM(card, t, st, tReal) {
+  const g = prepareCardCanvas(card, st);
+  const w = st.w, h = st.h;
+  const ch = getChapterIndex(tReal);
+
+  if (ch === 0) {
+    const flip = seg(tReal, 6.15, 7.00, eInOutCubic);
+
+    if (flip < 0.99) {
+      g.save();
+      g.globalAlpha = 1 - flip;
+      drawGlassChip(g, 28, 20, 342, 30, '90% 的人每天都在刷 AI  ·  真实痛点诊断', {
+        bg: 'rgba(22, 14, 12, 0.65)', stroke: 'rgba(251, 191, 36, 0.58)', color: '#FDE68A', font: `700 12px ${F_UI}`, align: 'left', dotColor: '#FBBF24'
+      });
+      drawGlassChip(g, w - 216, 20, 188, 30, '0 件属于你的成品', {
+        bg: 'rgba(28, 12, 16, 0.68)', stroke: '#FCA5A5', color: '#FCA5A5', font: `700 12px ${F_UI}`
+      });
+
+      g.font = `700 23.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText('每天刷遍 AI 资讯与神作，为什么手里却没有一件成品？', 28, 78);
+
+      const painMetrics = [
+        ['聊天记录 420+ 条', '停留在零散问答 · 关掉窗口即忘', '#FCA5A5'],
+        ['收藏夹 ★ 99+ 吃灰', '环境配置太繁琐 · 从没跑通一次', '#FDE68A'],
+        ['0 件真正代表作', '到处切号找渠道 · 套路多门槛高', '#38BDF8'],
+      ];
+      const pw = (w - 56 - 24) / 3;
+      painMetrics.forEach(([t1, t2, col], idx) => {
+        const px = 28 + idx * (pw + 12), py = 96;
+        rr(g, px, py, pw, 56, 14);
+        g.fillStyle = 'rgba(18, 14, 24, 0.62)'; g.fill();
+        g.strokeStyle = col; g.lineWidth = 1.2; g.stroke();
+        g.font = `700 14px ${F_UI}`;
+        g.fillStyle = col;
+        g.fillText(t1, px + 14, py + 23);
+        g.font = `500 11.5px ${F_UI}`;
+        g.fillStyle = WHITE(0.84);
+        g.fillText(t2, px + 14, py + 44);
+      });
+
+      const sideW = 190, midW = 240, gapC = 17;
+      drawRoundedImage(g, ASSETS.hermesAgent, 28, 166, sideW, 242, 18, {
+        badge: '到处切号繁琐', badgeColor: '#FCA5A5',
+        captionTitle: '旗舰模型门槛高', captionSub: '缺稳定入口 · 体验割裂', alpha: 0.84
+      });
+      drawRoundedImage(g, ASSETS.remotionVideo, 28 + sideW + gapC, 160, midW, 254, 20, {
+        stroke: 'rgba(251, 191, 36, 0.65)', lineWidth: 1.8,
+        badge: '★ 99+ 收藏吃灰', badgeColor: '#FDE68A',
+        captionTitle: '硬核项目配环境劝退', captionSub: '依赖报错折腾半宿 · 0 次跑通', alpha: 0.88
+      });
+      drawRoundedImage(g, ASSETS.helloAlgo, 28 + sideW + gapC + midW + gapC, 166, sideW, 242, 18, {
+        badge: '套路集赞领额度', badgeColor: '#FCA5A5',
+        captionTitle: '算力门槛劝退动手', captionSub: '还没开始做作品就被套路消耗', alpha: 0.84
+      });
+
+      rr(g, 28, 428, w - 56, 68, 20);
+      g.fillStyle = 'rgba(10, 22, 30, 0.64)'; g.fill();
+      g.strokeStyle = 'rgba(155, 224, 197, 0.55)'; g.lineWidth = 1.4; g.stroke();
+
+      drawMascot(g, 66, 462, 56, t, { bobAmp: 2.0 });
+      g.font = `700 15px ${F_UI}`;
+      g.fillStyle = '#9BE0C5';
+      g.fillText('破局时刻：做 https://ans.cauai.fun 的原因很简单', 104, 454);
+      g.font = `500 12.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.92);
+      g.fillText('在 Day 1，直接把最实在的三件事安排到位 —— 告别吃灰，直接做出成品！', 104, 477);
+      g.restore();
+    }
+
+    if (flip > 0.01) {
+      g.save();
+      g.globalAlpha = flip;
+      drawGlassChip(g, 28, 20, 332, 30, 'Day 01 / 28  ·  ANS (AI Never Stops) 正式上线', {
+        bg: 'rgba(8, 16, 28, 0.58)', stroke: 'rgba(155, 224, 197, 0.55)', color: '#9BE0C5', font: `700 12px ${F_UI}`, align: 'left', dotColor: '#4ADE80'
+      });
+      drawGlassChip(g, w - 216, 20, 188, 30, 'https://ans.cauai.fun', {
+        bg: 'rgba(8, 16, 28, 0.58)', stroke: 'rgba(56, 189, 248, 0.52)', color: '#38BDF8', font: `700 12px ${F_MONO}`
+      });
+
+      g.font = `700 24px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText('在 Day 1，我们直接把最实在的三件事安排到位：', 28, 78);
+
+      const p3 = [
+        ['① 顶配模型直接爽玩', 'GPT-6-Astra · 大肥鱼 · Opus 5.5', '#9BE0C5'],
+        ['② 最快上手顶级项目', '开源宝藏与 VibeHub 实战', '#38BDF8'],
+        ['③ 注册即送免费算力', '进来就有免费额度 · 不玩套路', '#FDE68A'],
+      ];
+      const pw = (w - 56 - 24) / 3;
+      const subU = clamp((tReal - 6.54) / 7.5);
+      const highlightIdx = subU < 0.48 ? 0 : (subU < 0.74 ? 1 : 2);
+
+      p3.forEach(([t1, t2, col], idx) => {
+        const px = 28 + idx * (pw + 12), py = 96;
+        const isHi = idx === highlightIdx;
+        rr(g, px, py, pw, 56, 14);
+        g.fillStyle = isHi ? 'rgba(155, 224, 197, 0.18)' : 'rgba(8, 16, 28, 0.56)';
+        g.fill();
+        g.strokeStyle = col;
+        g.lineWidth = isHi ? 2.2 : 1.2;
+        g.stroke();
+        g.font = `700 13.5px ${F_UI}`;
+        g.fillStyle = col;
+        g.fillText(t1, px + 14, py + 23);
+        g.font = `500 11.5px ${F_UI}`;
+        g.fillStyle = WHITE(0.88);
+        g.fillText(t2, px + 14, py + 44);
+      });
+
+      const sideW = 190, midW = 240, gapC = 17;
+      drawRoundedImage(g, ASSETS.helloAlgo, 28, 166, sideW, 244, 18, {
+        badge: '学习成长宝藏', badgeColor: '#9BE0C5',
+        captionTitle: 'Hello 算法 · 图解数据结构', captionSub: '动画与多语言代码对照实操'
+      });
+      drawRoundedImage(g, ASSETS.hermesAgent, 28 + sideW + gapC, 160, midW, 256, 20, {
+        stroke: '#9BE0C5', lineWidth: 2.0,
+        badge: '★ ANS.CAUAI.FUN', badgeColor: '#9BE0C5',
+        captionTitle: 'Hermes Agent · 智能体工坊', captionSub: '顶配模型 + 技能编排一键跑通'
+      });
+      drawRoundedImage(g, ASSETS.remotionVideo, 28 + sideW + gapC + midW + gapC, 166, sideW, 244, 18, {
+        badge: 'AIGC 创作利器', badgeColor: '#38BDF8',
+        captionTitle: 'Remotion 视频开发', captionSub: '用 React 与 Web 代码做视频'
+      });
+
+      // Animated cursor focusing across the 3 pillars!
+      const curTargetX = 28 + highlightIdx * (pw + 12) + pw * 0.78;
+      drawPointerCursor(g, curTargetX, 138, 0.95, Math.exp(-Math.pow(((subU * 3) % 1 - 0.15) / 0.12, 2)), p3[highlightIdx][2]);
+
+      rr(g, 28, 428, w - 56, 68, 20);
+      g.fillStyle = 'rgba(8, 16, 28, 0.54)'; g.fill();
+      g.strokeStyle = 'rgba(155, 224, 197, 0.48)'; g.lineWidth = 1.2; g.stroke();
+
+      drawMascot(g, 66, 462, 56, t, { bobAmp: 2.0 });
+      g.font = `700 15px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText('告别只剩聊天记录和收藏夹吃灰', 104, 454);
+      g.font = `500 12.5px ${F_UI}`;
+      g.fillStyle = MINT(0.95);
+      g.fillText('顶配模型直接爽玩 · 顶级项目最快上手 · 注册即送免费算力', 104, 476);
+
+      drawGlassChip(g, w - 186, 444, 142, 36, '开始实机导览 →', {
+        bg: '#9BE0C5', stroke: '', color: '#041016', font: `700 13px ${F_UI}`
+      });
+      g.restore();
+    }
+    return;
+  }
+
+  // CHAPTERS 1 .. 6: Live Interactive Website Tour inside Center Hero Studio
+  if (ch >= 1 && ch <= 6) {
+    const tour = getTourStageState(tReal);
+    drawLiveBrowserWindow(g, w, h, tour, tReal);
+  }
+}
+
+// CARD 2 (RIGHT)
+function drawCardR(card, t, st, tReal) {
+  const g = prepareCardCanvas(card, st);
+  const w = st.w, h = st.h;
+  const ch = getChapterIndex(tReal);
+
+  if (ch === 0) {
+    const flip = seg(tReal, 6.15, 7.00, eInOutCubic);
+    if (flip < 0.99) {
+      g.save();
+      g.globalAlpha = 1 - flip;
+      drawGlassChip(g, 24, 22, 260, 30, '90% 的人每天都在刷 AI  ·  痛点 #2', {
+        bg: 'rgba(20, 16, 10, 0.58)', stroke: 'rgba(251, 191, 36, 0.55)', color: '#FDE68A', font: `700 12px ${F_MONO}`, align: 'left', dotColor: '#FBBF24'
+      });
+      g.font = `700 22px ${F_UI}`;
+      g.fillStyle = WHITE(0.98);
+      g.fillText('收藏夹吃灰 ★ 99+ 从未跑通', 24, 82);
+      g.font = `500 13.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.76);
+      g.fillText('到处翻教程配环境，收藏了上百个神作却从没真正动手', 24, 106);
+
+      drawRoundedImage(g, ASSETS.remotionVideo, 24, 124, w - 48, 166, 16, {
+        badge: '★ 99+ 收藏吃灰', badgeColor: '#FCA5A5',
+        captionTitle: '硬核 AI 教程收藏夹', captionSub: '环境配置太繁琐 · 从未跑通一次', alpha: 0.78
+      });
+      drawRoundedImage(g, ASSETS.helloAlgo, 24, 304, w - 48, 166, 16, {
+        badge: '★ 99+ 搁置未动', badgeColor: '#FCA5A5',
+        captionTitle: '全网爆火 AI 玩法合集', captionSub: '只看不练 · 手里依然没有自己的成品', alpha: 0.78
+      });
+      g.restore();
+    }
+    if (flip > 0.01) {
+      g.save();
+      g.globalAlpha = flip;
+      drawGlassChip(g, 24, 22, 256, 30, 'Day 01 安排到位  ·  第三件事', {
+        bg: 'rgba(8, 16, 28, 0.56)', stroke: 'rgba(251, 191, 36, 0.55)', color: '#FDE68A', font: `700 12px ${F_UI}`, align: 'left', dotColor: '#FBBF24'
+      });
+      g.font = `700 22px ${F_UI}`;
+      g.fillStyle = WHITE(0.99);
+      g.fillText('第三件，注册即送免费算力', 24, 82);
+      g.font = `500 13.5px ${F_UI}`;
+      g.fillStyle = WHITE(0.80);
+      g.fillText('进来就有免费额度，直接开造，不玩套路', 24, 106);
+
+      drawRoundedImage(g, ASSETS.aiAgents, 24, 124, w - 48, 206, 18, {
+        chromeUrl: 'ans.cauai.fun',
+        badge: 'FREE COMPUTE', badgeColor: '#FDE68A',
+        captionTitle: '注册即领免费算力额度', captionSub: '直接体验顶配模型与开源宝藏项目'
+      });
+
+      rr(g, 24, 344, w - 48, 126, 18);
+      g.fillStyle = 'rgba(10, 28, 30, 0.56)'; g.fill();
+      g.strokeStyle = '#9BE0C5'; g.lineWidth = 1.4; g.stroke();
+      drawMascot(g, 76, 407, 86, t, { bobAmp: 2.5 });
+      g.font = `700 15px ${F_UI}`;
+      g.fillStyle = '#9BE0C5';
+      g.fillText('立个 28 天的 Flag：', 132, 384);
+      g.font = `500 13px ${F_UI}`;
+      g.fillStyle = WHITE(0.95);
+      g.fillText('每天要么上线清晰有感的真改进，', 132, 410);
+      g.fillText('要么直接 Full Reset 全员额度重置！', 132, 434);
+      g.restore();
+    }
+    return;
+  }
+
+  if (ch >= 1 && ch <= 6) {
+    const tour = getTourStageState(tReal);
+    drawSideHudCard(g, w, h, 'R', tour, tReal);
+    return;
+  }
+
+  // CHAPTER 7 Right Wide Card: 立个 28 天的 Flag × Full Reset 认罚发算力 × 小恐龙伴侣
+  {
+    drawGlassChip(g, 28, 22, 308, 32, '立个 28 天的 Flag  ·  全员公开监督', {
+      bg: 'rgba(8, 16, 28, 0.58)', stroke: 'rgba(56, 189, 248, 0.55)', color: '#38BDF8', font: `700 12.5px ${F_UI}`, align: 'left', dotColor: '#4ADE80'
+    });
+    drawGlassChip(g, w - 224, 22, 196, 32, 'Full Reset 认罚发算力', {
+      bg: 'rgba(24, 20, 10, 0.68)', stroke: '#FDE68A', color: '#FDE68A', font: `700 12px ${F_UI}`
+    });
+
+    g.font = `700 24px ${F_UI}`;
+    g.fillStyle = WHITE(0.99);
+    g.fillText('接下来的 28 天里，每一天我们只做两件事中的一件：', 28, 86);
+
+    const stageX = 28, stageY = 108, stageW = 434, stageH = 330;
+    rr(g, stageX, stageY, stageW, stageH, 22);
+    g.fillStyle = 'rgba(8, 16, 28, 0.58)'; g.fill();
+    g.strokeStyle = 'rgba(155, 224, 197, 0.52)'; g.lineWidth = 1.5; g.stroke();
+
+    rr(g, stageX + 18, stageY + 18, stageW - 36, 92, 16);
+    g.fillStyle = 'rgba(10, 32, 32, 0.62)'; g.fill();
+    g.strokeStyle = '#9BE0C5'; g.lineWidth = 1.4; g.stroke();
+    g.font = `700 14px ${F_UI}`;
+    g.fillStyle = '#9BE0C5';
+    g.fillText('✓ 每日承诺 A · 真正切中需求的改进', stageX + 34, stageY + 46);
+    g.font = `600 14px ${F_UI}`;
+    g.fillStyle = WHITE(0.98);
+    g.fillText('上线一项对大多数 ANS 用户都清晰有感、', stageX + 34, stageY + 72);
+    g.fillText('真正切中需求的改进；', stageX + 34, stageY + 94);
+
+    rr(g, stageX + 18, stageY + 124, stageW - 36, 92, 16);
+    g.fillStyle = 'rgba(30, 22, 12, 0.62)'; g.fill();
+    g.strokeStyle = '#FDE68A'; g.lineWidth = 1.4; g.stroke();
+    g.font = `700 14px ${F_UI}`;
+    g.fillStyle = '#FDE68A';
+    g.fillText('★ 每日承诺 B · Full Reset 认罚发算力', stageX + 34, stageY + 152);
+    g.font = `600 14px ${F_UI}`;
+    g.fillStyle = WHITE(0.98);
+    g.fillText('要是没做到，直接来一次全员额度重置', stageX + 34, stageY + 178);
+    g.fillText('（Full Reset 认罚发算力）！', stageX + 34, stageY + 200);
+
+    rr(g, stageX + 18, stageY + 230, stageW - 36, 82, 16);
+    g.fillStyle = 'rgba(6, 12, 22, 0.72)'; g.fill();
+    g.strokeStyle = 'rgba(56, 189, 248, 0.45)'; g.lineWidth = 1.2; g.stroke();
+    g.font = `700 15px ${F_UI}`;
+    g.fillStyle = '#9BE0C5';
+    g.fillText('● Day 01 / 28 已正式启动  ·  让改进开始吧。', stageX + 34, stageY + 262);
+    g.font = `500 13px ${F_UI}`;
+    g.fillStyle = WHITE(0.88);
+    g.fillText('立即访问 https://ans.cauai.fun 领取免费算力额度', stageX + 34, stageY + 290);
+
+    const rx = 476, rw = w - rx - 28;
+    rr(g, rx, 108, rw, 206, 22);
+    g.fillStyle = 'rgba(10, 28, 30, 0.56)'; g.fill();
+    g.strokeStyle = '#9BE0C5'; g.lineWidth = 1.4; g.stroke();
+    drawMascot(g, rx + rw / 2, 192, 134, t, { bobAmp: 4.0 });
+    g.font = `700 14px ${F_UI}`;
+    g.fillStyle = WHITE(0.98);
+    g.textAlign = 'center';
+    g.fillText('ANS 吉祥物伴侣 · 见证 28 天', rx + rw / 2, 294);
+
+    const py = 326, ph = 112;
+    rr(g, rx, py, rw, ph, 18);
+    g.fillStyle = 'rgba(8, 16, 28, 0.62)'; g.fill();
+    g.strokeStyle = '#FDE68A'; g.lineWidth = 1.4; g.stroke();
+    g.font = `700 13px ${F_MONO}`;
+    g.fillStyle = '#FDE68A';
+    g.fillText('DAY 01 -> DAY 28 FLAG', rx + rw / 2, py + 30);
+    g.font = `700 15px ${F_UI}`;
+    g.fillStyle = WHITE(0.99);
+    g.fillText('要么每天上线有感改进', rx + rw / 2, py + 60);
+    g.font = `600 13px ${F_UI}`;
+    g.fillStyle = '#9BE0C5';
+    g.fillText('要么直接全员额度重置！', rx + rw / 2, py + 88);
+    g.textAlign = 'left';
+
+    drawGlassChip(g, 28, 454, w - 56, 44, '● Day 01 / 28 · ANS (AI Never Stops) 正式上线  —  让改进开始吧。', {
+      bg: 'rgba(8, 16, 28, 0.56)', stroke: 'rgba(155, 224, 197, 0.48)', color: WHITE(0.98), font: `700 14px ${F_UI}`
+    });
+  }
+}
+
+// ------------------------------------------------------------------ 10. Foreground Kinetic Typography & Pure Verbatim Subtitle Bar
+const overCv = document.createElement('canvas'); overCv.width = RW; overCv.height = RH;
+const og = overCv.getContext('2d');
+const overTex = canvasTex(false);
+
+const glyphCv = document.createElement('canvas'); glyphCv.width = RW; glyphCv.height = RH;
+const gg = glyphCv.getContext('2d');
+const glyphTex = canvasTex(false);
+
+function drawPolygonPath(ctx, pts) {
+  if (!pts.length) return;
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+}
+
+function drawKineticHeadline(g, t, tReal) {
+  const ch = getChapterIndex(tReal);
+  const [r0, r1] = TL.chapters[ch] || [0, 14.3];
+  const local = tReal - r0;
+  const dur = Math.max(0.1, r1 - r0);
+
+  let tag = 'DAY 01 / 28  ·  ANS (AI NEVER STOPS) 正式上线  ·  HTTPS://ANS.CAUAI.FUN';
+  let part1 = '90% 的人每天都在刷 AI，';
+  let part2 = '最后手里却只剩聊天记录和收藏夹吃灰。';
+  let fs = 40;
+
+  if (ch === 0) {
+    if (tReal >= 6.35) {
+      part1 = '所以在 Day 1，';
+      part2 = '我们直接把最实在的三件事安排到位：';
+    }
+  } else if (ch === 1) {
+    tag = 'LIVE TOUR #01  ·  ANS 项目广场 (/EXPLORE)  ·  分类切换与下滑浏览';
+    part1 = '项目广场实机浏览：';
+    part2 = '汇聚开源宝藏，多分类自由切换下滑找项目。';
+  } else if (ch === 2) {
+    tag = 'LIVE TOUR #02  ·  ANS VIBEHUB (/VIBE-HUB)  ·  术语图鉴与课程练习';
+    part1 = 'VibeHub 边做边学：';
+    part2 = '下滑浏览 24 种设计风格范例，配套课程与练习。';
+  } else if (ch === 3) {
+    tag = 'LIVE TOUR #03  ·  3D 小恐龙 AGENT  ·  连点三下放大与挥鞭催干活';
+    part1 = '专属小恐龙 Agent：';
+    part2 = '连点三下放大近景互动，抽几下鞭子光速敲代码。';
+  } else if (ch === 4) {
+    tag = 'LIVE TOUR #04  ·  3D 小恐龙 AGENT  ·  盲盒零食投喂与 3D 衣橱换装';
+    part1 = '盲盒投喂与 3D 衣橱：';
+    part2 = '喂零食拉满好感度，一键换装 360° 旋转预览。';
+  } else if (ch === 5) {
+    tag = 'LIVE TOUR #05  ·  ANS 创作者市场 (/MARKET)  ·  平台推流与积分交易';
+    part1 = '上架 ANS 创作者市场：';
+    part2 = '平台主动帮你推流曝光，提供完善交易变现环境。';
+  } else if (ch === 6) {
+    tag = 'LIVE TOUR #06  ·  社区组队 (/TEAMS)  ×  农客松大赛  ×  中国农大 CAUHUB';
+    part1 = '社群组队 · 农客松 · 高校 Hub：';
+    part2 = '交换需求组队参赛，首站已入驻中国农大 CAUHub。';
+  } else {
+    if (t < 13.05) {
+      tag = 'DAY 01 / 28 公开军令状  ·  每日有感真改进  ×  FULL RESET 认罚发算力';
+      part1 = '立个 28 天的 Flag：';
+      part2 = '每天要么上线有感真改进，要么直接全员额度重置！';
+    } else {
+      fs = 50;
+      tag = 'DAY 01 / 28  ·  ANS (AI NEVER STOPS) 正式上线  ·  HTTPS://ANS.CAUAI.FUN';
+      part1 = 'ANS · AI Never Stops — ';
+      part2 = '让改进开始吧。';
+    }
+  }
+
+  const fadeOut = ch < 7 ? (1 - seg(local, dur - 0.25, dur)) : 1.0;
+  const rTag = riseA(local, 0.0, 0.42);
+  const r1a = riseA(local, 0.04, 0.48);
+  const r2a = riseA(local, 0.12, 0.52);
+
+  g.save();
+  const scrim = g.createLinearGradient(0, 0, 0, 195);
+  scrim.addColorStop(0, 'rgba(4, 5, 16, 0.72)');
+  scrim.addColorStop(0.7, 'rgba(4, 5, 16, 0.28)');
+  scrim.addColorStop(1, 'rgba(4, 5, 16, 0)');
+  g.fillStyle = scrim;
+  g.fillRect(0, 0, W, 195);
+
+  g.save();
+  g.globalAlpha = rTag.a * fadeOut;
+  g.font = `700 13px ${F_UI}`;
+  const tagTextW = g.measureText(tag).width;
+  const logoBadgeW = 92;
+  const pillW = logoBadgeW + tagTextW + 38;
+  const pillX = 960 - pillW / 2;
+  const pillY = 26 + rTag.dy * 0.5;
+  const pillH = 32;
+
+  rr(g, pillX, pillY, pillW, pillH, 16);
+  g.fillStyle = 'rgba(8, 14, 26, 0.72)';
+  g.fill();
+  g.strokeStyle = 'rgba(155, 224, 197, 0.45)';
+  g.lineWidth = 1.2;
+  g.stroke();
+
+  drawAnsLogo(g, pillX + 26, pillY + pillH / 2 + 0.5, 20, 'mint', { glow: true });
+  g.font = `800 13.5px ${F_DISP}`;
+  g.fillStyle = '#FFFFFF';
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillText('ANS', pillX + 42, pillY + pillH / 2 + 0.5);
+
+  g.fillStyle = 'rgba(255, 255, 255, 0.28)';
+  g.fillRect(pillX + 82, pillY + 7, 1.5, pillH - 14);
+
+  g.font = `700 12.5px ${F_UI}`;
+  g.fillStyle = '#9BE0C5';
+  g.fillText(tag, pillX + 96, pillY + pillH / 2 + 0.5);
+  g.restore();
+
+  g.font = `700 ${fs}px ${F_CN}`;
+  const w1 = g.measureText(part1).width;
+  const w2 = g.measureText(part2).width;
+  const totalW = w1 + w2;
+  const x0 = 960 - totalW / 2;
+  const baseY = 112;
+
+  g.textAlign = 'left';
+  g.shadowColor = 'rgba(4, 6, 18, 0.65)';
+  g.shadowBlur = 24;
+  g.shadowOffsetY = 6;
+
+  g.globalAlpha = r1a.a * fadeOut;
+  g.fillStyle = '#FFFFFF';
+  g.fillText(part1, x0, baseY + r1a.dy);
+
+  g.globalAlpha = r2a.a * fadeOut;
+  const gr = g.createLinearGradient(x0 + w1, 0, x0 + totalW, 0);
+  gr.addColorStop(0, '#9BE0C5');
+  gr.addColorStop(0.55, '#67E8F9');
+  gr.addColorStop(1, '#FDE68A');
+  g.fillStyle = gr;
+  g.fillText(part2, x0 + w1, baseY + r2a.dy);
+
+  const ulW = w2 * eOutCubic(inv(0.14, 0.68, local));
+  if (ulW > 2) {
+    rr(g, x0 + w1, baseY + 12 + r2a.dy, ulW, 3.5, 1.8);
+    g.fillStyle = gr;
+    g.fill();
+  }
+  g.restore();
+}
+
+// Pure Single-Line Verbatim Subtitle Bar at y=996..1048:
+// ZERO "DRAMA-3" badge, ZERO equalizer bars, ZERO extra labels — ONLY the 100% verbatim subtitle text!
+const HIGHLIGHT_RE = /(ans\.cauai\.fun|AI Never Stops|ANS|Day 1|百分之九十|顶配模型|最快上手顶级项目|免费算力|项目广场|学习成长|GitHub 宝藏|效率与生活|VibeHub|术语图鉴|现代简约|苹果风|Bento 便当格|小恐龙 Agent|连续点击它三下|近景互动台|抽几下鞭子|盲盒投喂|3D 衣橱|三百六十度|ANS 市场|推流曝光|积分结算与交易环境|交换真实需求|跨学科组队参赛|大赛专区|黑客松|AIGC 比赛|农客松大赛|高校 Hub|中国农业大学 CAU|CAUHub|二十八天|全员额度重置)/g;
+const GOLD_TERMS = new Set(['百分之九十', '免费算力', '抽几下鞭子', '3D 衣橱', '推流曝光', '农客松大赛', '中国农业大学 CAU', 'CAUHub', '全员额度重置']);
+
+function drawSubtitleBar(g, tReal) {
+  const subs = TL.subtitles || [];
+  let active = null;
+  for (let i = 0; i < subs.length; i++) {
+    if (tReal >= subs[i].start - 0.05 && tReal <= subs[i].end) {
+      active = subs[i];
+      break;
+    }
+  }
+  if (!active) return;
+
+  const aIn = seg(tReal, active.start - 0.05, active.start + 0.14, eOutCubic);
+  const aOut = 1 - seg(tReal, active.end - 0.14, active.end, eInOutCubic);
+  const alpha = clamp(aIn * aOut, 0, 1);
+  if (alpha <= 0.01) return;
+
+  const text = active.text;
+  const tokens = text.split(HIGHLIGHT_RE).filter(Boolean);
+
+  g.save();
+  g.globalAlpha = alpha;
+  g.font = `700 22px ${F_CN}`;
+
+  let textW = 0;
+  for (const tk of tokens) textW += g.measureText(tk).width;
+
+  const padX = 34;
+  const pillW = Math.min(1800, textW + padX * 2);
+  const pillH = 52;
+  const pillX = 960 - pillW / 2;
+  const pillY = 998 + 6 * (1 - aIn);
+
+  g.shadowColor = 'rgba(2, 6, 18, 0.76)';
+  g.shadowBlur = 22;
+  g.shadowOffsetY = 6;
+  rr(g, pillX, pillY, pillW, pillH, 26);
+  g.fillStyle = 'rgba(6, 12, 24, 0.86)';
+  g.fill();
+  g.shadowBlur = 0;
+  g.shadowOffsetY = 0;
+  g.strokeStyle = 'rgba(155, 224, 197, 0.44)';
+  g.lineWidth = 1.2;
+  g.stroke();
+
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  let curX = 960 - textW / 2;
+  const cy = pillY + pillH / 2 + 0.5;
+  for (const tk of tokens) {
+    if (GOLD_TERMS.has(tk)) {
+      g.fillStyle = '#FDE68A';
+    } else if (HIGHLIGHT_RE.test(tk)) {
+      g.fillStyle = '#9BE0C5';
+    } else {
+      g.fillStyle = '#F8FAFC';
+    }
+    HIGHLIGHT_RE.lastIndex = 0;
+    g.fillText(tk, curX, cy);
+    curX += g.measureText(tk).width;
+  }
+  g.restore();
+}
+
+const CANON_MAP = [
+  [0.00, 0.72, 2.94, 3.20, 0.75, 0.36], // ch0
+  [3.20, 3.90, 5.10, 5.25, 0.65, 0.25], // ch1
+  [5.25, 5.85, 7.00, 7.20, 0.65, 0.25], // ch2
+  [7.20, 7.85, 9.00, 9.25, 0.65, 0.25], // ch3
+  [9.25, 9.85, 10.60, 10.80, 0.65, 0.25], // ch4
+  [10.80, 11.00, 11.20, 11.35, 0.65, 0.25], // ch5
+  [11.35, 11.40, 11.45, 11.50, 0.65, 0.25], // ch6
+  [11.50, 12.15, 14.95, 15.00, 0.75, 0.25], // ch7
+];
+
+function mapRealToCanon(tReal) {
+  const chs = TL.chapters;
+  if (!chs || !chs.length) return clamp(tReal, 0, 15.0);
+  const ch = getChapterIndex(tReal);
+  const [r0, r1] = chs[ch];
+  if (ch === 7) {
+    // Clause 15 (108.76..115.66s) shows the Dual 28-Day Flag Cards (t=11.5..12.95)
+    // Clause 16 (115.66..121.96s) parts the curtains and morphs the giant "ANS" monument (t=12.95..15.0)
+    if (tReal < 115.50) {
+      const u = clamp((tReal - r0) / Math.max(0.1, 115.50 - r0));
+      return lerp(11.50, 12.92, u);
+    } else {
+      const u = clamp((tReal - 115.50) / Math.max(0.1, r1 - 115.50));
+      return lerp(12.95, 15.00, u);
+    }
+  }
+  const [cIn0, cHold0, cHold1, cOut1, inReal, outReal] = CANON_MAP[ch];
+  const dur = Math.max(0.1, r1 - r0);
+  const local = clamp(tReal - r0, 0, dur);
+  if (local <= inReal) return lerp(cIn0, cHold0, local / inReal);
+  if (local <= dur - outReal) return lerp(cHold0, cHold1, (local - inReal) / Math.max(0.1, dur - inReal - outReal));
+  return lerp(cHold1, cOut1, (local - (dur - outReal)) / outReal);
+}
+
+function drawForegroundAndGlyphs(t, tReal) {
+  og.setTransform(DPR, 0, 0, DPR, 0, 0);
+  og.clearRect(0, 0, W, H);
+  gg.setTransform(DPR, 0, 0, DPR, 0, 0);
+  gg.clearRect(0, 0, W, H);
+
+  drawKineticHeadline(og, t, tReal);
+
+  // Chapter 0 Second Half Bottom 4 Pills
+  const ch = getChapterIndex(tReal);
+  if (ch === 0 && tReal >= 6.45) {
+    const a1 = seg(tReal, 6.45, 7.15, eOutCubic) * (1 - seg(tReal, 13.85, 14.28));
+    og.save();
+    og.globalAlpha = a1;
+    const pills = [
+      ['第一件', '顶配模型直接爽玩', 'GPT-6-Astra · 大肥鱼 · Opus 5.5', '#9BE0C5'],
+      ['第二件', '最快上手顶级项目', '项目广场 + VibeHub 术语图鉴', '#38BDF8'],
+      ['第三件', '注册即送免费算力', '进来就有免费额度 · 不玩套路', '#FDE68A'],
+      ['生态全通', '市场 · 社群 · 农客松 · CAUHub', '3D 小恐龙互动 + 高校 Hub 入驻', '#9BE0C5'],
+    ];
+    const pw = 396, ph = 74, gap = 24;
+    const startX = 960 - (pw * 4 + gap * 3) / 2;
+    const py = 842 + 18 * (1 - a1);
+
+    pills.forEach(([num, title, sub, col], i) => {
+      const px = startX + i * (pw + gap);
+      rr(og, px, py, pw, ph, 24);
+      og.fillStyle = 'rgba(14, 20, 34, 0.62)'; og.fill();
+      og.strokeStyle = 'rgba(255, 255, 255, 0.24)'; og.lineWidth = 1.2; og.stroke();
+
+      rr(og, px + 14, py + 13, 84, 48, 16);
+      og.fillStyle = 'rgba(255, 255, 255, 0.10)'; og.fill();
+      og.font = `800 18px ${F_UI}`;
+      og.fillStyle = col;
+      og.textAlign = 'center';
+      og.textBaseline = 'middle';
+      og.fillText(num, px + 56, py + 38);
+
+      og.textAlign = 'left';
+      og.textBaseline = 'alphabetic';
+      og.font = `700 16px ${F_UI}`;
+      og.fillStyle = WHITE(0.98);
+      og.fillText(title, px + 114, py + 33);
+      og.font = `500 12.5px ${F_UI}`;
+      og.fillStyle = WHITE(0.72);
+      og.fillText(sub, px + 114, py + 54);
+    });
+    og.restore();
+  }
+
+  // Chapter 7 Finale (t >= 13.0s): Official ANS Monogram + Refractive "ANS" + Authentic Mascot + ans.cauai.fun
+  let hasGlyphMask = false;
+  if (t >= 13.0) {
+    hasGlyphMask = true;
+    const eMorph = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+
+    gg.save();
+    const waveCatch = Math.round(255 * (0.06 + 0.55 * Math.exp(-Math.pow((t - 13.55) / 0.12, 2))));
+    gg.fillStyle = `rgb(255, ${waveCatch}, 255)`;
+    ANS_MORPH.items.forEach((item, idx) => {
+      const lu = clamp((t - (13.0 + idx * 0.05)) / 0.78);
+      const gA = eMorph(clamp(lu / 0.42));
+      const gB = eMorph(clamp((lu - 0.42) / 0.58));
+      const pts = lu < 0.42 ? lerpPoly(item.sing, item.prim, gA) : lerpPoly(item.prim, item.outer, gB);
+
+      gg.beginPath();
+      drawPolygonPath(gg, pts);
+      if (lu > 0.45 && item.holes.length > 0) {
+        const hu = eMorph(clamp((lu - 0.45) / 0.55));
+        for (const h of item.holes) {
+          drawPolygonPath(gg, lerpPoly(h.seed, h.target, hu));
+        }
+      }
+      gg.fill('nonzero');
+    });
+    gg.restore();
+
+    const embA = seg(t, 13.10, 13.70, eOutBack);
+    if (embA > 0.01) {
+      const eCX = ANS_MORPH.emblemCX, eCY = ANS_MORPH.emblemCY;
+      og.save();
+      og.globalAlpha = clamp(embA, 0, 1);
+      og.translate(eCX, eCY);
+      og.scale(embA, embA);
+
+      const embGlow = og.createRadialGradient(0, 0, 24, 0, 0, 155);
+      embGlow.addColorStop(0, 'rgba(155, 224, 197, 0.34)');
+      embGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.14)');
+      embGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      og.fillStyle = embGlow;
+      og.beginPath(); og.arc(0, 0, 155, 0, TAU); og.fill();
+
+      rr(og, -106, -106, 212, 212, 46);
+      const sqGr = og.createLinearGradient(-106, -106, 106, 106);
+      sqGr.addColorStop(0, 'rgba(18, 34, 46, 0.78)');
+      sqGr.addColorStop(1, 'rgba(8, 14, 28, 0.86)');
+      og.fillStyle = sqGr;
+      og.fill();
+      og.strokeStyle = 'rgba(155, 224, 197, 0.68)';
+      og.lineWidth = 2.2;
+      og.stroke();
+
+      rr(og, -98, -98, 196, 196, 40);
+      og.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      og.lineWidth = 1.0;
+      og.stroke();
+
+      drawAnsLogo(og, 0, -4, 156, 'white', { glow: true, glowColor: 'rgba(155, 224, 197, 0.65)', glowBlur: 24 });
+
+      og.font = `700 11.5px ${F_MONO}`;
+      og.fillStyle = '#9BE0C5';
+      og.textAlign = 'center';
+      og.fillText('OFFICIAL MONOGRAM', 0, 86);
+      og.restore();
+    }
+
+    const subA = riseA(t, 13.30, 0.65);
+    if (subA.a > 0) {
+      og.save();
+      og.globalAlpha = subA.a;
+      const sy = 626 + subA.dy;
+      og.shadowColor = 'rgba(4, 6, 24, 0.65)';
+      og.shadowBlur = 16;
+      og.shadowOffsetY = 3;
+
+      const cx = 772;
+      og.font = `700 42px ${F_DISP}`;
+      const txt1 = 'AI Never Stops';
+      const w1 = og.measureText(txt1).width;
+
+      og.font = `600 28px ${F_MONO}`;
+      const txt2 = 'https://ans.cauai.fun';
+      const w2 = og.measureText(txt2).width;
+
+      const logoW = 44;
+      const gap = 22;
+      const tot = logoW + 14 + w1 + gap * 2 + 2 + w2;
+      const x0 = cx - tot / 2;
+
+      drawAnsLogo(og, x0 + logoW / 2, sy - 14, 38, 'mint', { glow: true });
+
+      const tx1 = x0 + logoW + 14;
+      og.font = `700 42px ${F_DISP}`;
+      og.fillStyle = WHITE(0.98);
+      og.textAlign = 'left';
+      og.fillText(txt1, tx1, sy);
+
+      og.fillStyle = WHITE(0.42);
+      og.fillRect(Math.round(tx1 + w1 + gap), sy - 32, 2, 38);
+
+      og.font = `600 28px ${F_MONO}`;
+      og.fillStyle = '#9BE0C5';
+      og.fillText(txt2, tx1 + w1 + gap * 2 + 2, sy - 3);
+
+      const barW = 860, barH = 62, barX = cx - barW / 2, barY = 684 + subA.dy;
+      rr(og, barX, barY, barW, barH, 31);
+      og.fillStyle = 'rgba(10, 18, 32, 0.58)'; og.fill();
+      og.strokeStyle = 'rgba(255, 255, 255, 0.30)'; og.lineWidth = 1.4; og.stroke();
+
+      rr(og, barX + 10, barY + 9, 272, 44, 22);
+      const pillGr = og.createLinearGradient(barX + 10, 0, barX + 282, 0);
+      pillGr.addColorStop(0, '#9BE0C5');
+      pillGr.addColorStop(1, '#38BDF8');
+      og.fillStyle = pillGr; og.fill();
+
+      og.shadowBlur = 0; og.shadowOffsetY = 0;
+      drawAnsLogo(og, barX + 38, barY + 31, 22, 'dark');
+      og.font = `700 15.5px ${F_UI}`;
+      og.fillStyle = '#041016';
+      og.textAlign = 'left';
+      og.fillText('Day 01 / 28 正式上线 →', barX + 56, barY + 36);
+
+      og.font = `600 14.2px ${F_UI}`;
+      og.fillStyle = WHITE(0.96);
+      og.fillText('项目广场  ·  VibeHub  ·  3D 小恐龙 Agent  ·  创作者市场  ·  农客松与 CAUHub', barX + 298, barY + 36);
+      og.restore();
+    }
+
+    const mA = seg(t, 13.15, 13.75, eOutBack);
+    if (mA > 0.01) {
+      const mCX = 1485, mCY = 495;
+      og.save();
+      og.globalAlpha = clamp(mA, 0, 1);
+      og.translate(mCX, mCY);
+      og.scale(mA, mA);
+
+      const ringGr = og.createRadialGradient(0, 0, 40, 0, 0, 175);
+      ringGr.addColorStop(0, 'rgba(155, 224, 197, 0.28)');
+      ringGr.addColorStop(0.65, 'rgba(52, 207, 240, 0.12)');
+      ringGr.addColorStop(1, 'rgba(52, 207, 240, 0)');
+      og.fillStyle = ringGr;
+      og.beginPath(); og.arc(0, 0, 175, 0, TAU); og.fill();
+
+      og.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+      og.lineWidth = 1.6;
+      og.beginPath(); og.arc(0, 0, 148, 0, TAU); og.stroke();
+
+      drawMascot(og, 0, 6, 268, t, { bobAmp: 4.0 });
+
+      drawGlassChip(og, -148, 158, 296, 36, '● 28 天每日有感改进  ·  否则全员额度重置', {
+        bg: 'rgba(10, 18, 32, 0.72)', stroke: 'rgba(155, 224, 197, 0.55)', color: '#9BE0C5', font: `600 13px ${F_UI}`
+      });
+      og.restore();
+    }
+  }
+
+  // Always render the pure single-line verbatim subtitle bar at bottom
+  drawSubtitleBar(og, tReal);
+
+  return hasGlyphMask;
+}
+
+// ------------------------------------------------------------------ 11. 7-Wavelength Spectral Refractive Liquid-Glass Lens (FS_LENS)
+function getLensState(t) {
+  if (t >= 13.05) {
+    const on = seg(t, 13.05, 13.45);
+    const rk = seg(t, 13.25, 13.75, eOutCubic);
+    const R = ANS_MORPH.ringR;
+    const ringW = lerp(R * 1.1, 14, rk);
+    const kw = inv(13.2, 14.4, t);
+    return {
+      on, c: [ANS_MORPH.ringX, ANS_MORPH.ringY], hx: R, hy: R, r: R, M: [1, 0, 0, 1],
+      bead: [0, 0, 0], beadK: 0, beadA: 0,
+      lift: 0.25, mag: 1.22, bezel: Math.min(R * 0.55, ringW * 0.5), ringW, warm: 0.25, cw: 0.16,
+      rgl: [lerp(-2.4, 1.2, inv(13.4, 14.6, t)), 0.95],
+      wave: [720 * eOutSine(kw), 0.09 * (1 - kw), 4.5 * (1 - kw)]
+    };
+  }
+  return { on: 0 };
+}
+
+// ------------------------------------------------------------------ 12. Master Deterministic Frame Renderer: window.renderAt(t) & window.__seek(t)
+async function renderFrame(tRealInput) {
+  const tReal = clamp(tRealInput, 0, DUR);
+  window.__tReal = tReal;
+  const t = mapRealToCanon(tReal);
+  const frame = Math.round(tReal * FPS * 4);
+  const cam = cameraAt(t, tReal);
+  const O = camO(cam);
+  const states = [0, 1, 2].map(i => ({ c: CARDS[i], s: getCardState(i, t, tReal), idx: i }));
+
+  if (states[0].s.op > 0.001) { drawCardL(CARDS[0], t, states[0].s, tReal); upload(CARDS[0].tex, CARDS[0].cv, true); }
+  if (states[1].s.op > 0.001) { drawCardM(CARDS[1], t, states[1].s, tReal); upload(CARDS[1].tex, CARDS[1].cv, true); }
+  if (states[2].s.op > 0.001) { drawCardR(CARDS[2], t, states[2].s, tReal); upload(CARDS[2].tex, CARDS[2].cv, true); }
+
+  {
+    const L = use(P.aurora, T.sceneA);
+    const tAurora = tReal * 0.35;
+    gl.uniform1f(L.uT, tAurora);
+    const blobs = new Float32Array(4 * BLOBS.length);
+    const blobE = new Float32Array(2 * BLOBS.length);
+    const cols = new Float32Array(3 * BLOBS.length);
+    BLOBS.forEach((b, i) => {
+      const p = b.path(tAurora);
+      blobs.set([p[0] - cam.x * 0.35, p[1] - cam.y * 0.35, b.rx, b.i], i * 4);
+      blobE.set([b.ry, b.ang * D2R + 0.08 * Math.sin(tAurora * 0.3 + i)], i * 2);
+      cols.set(hex(b.col), i * 3);
+    });
+    gl.uniform4fv(L.uBlob, blobs);
+    gl.uniform2fv(L.uBlobE, blobE);
+    gl.uniform3fv(L.uBlobC, cols);
+
+    let rip = [960, 540, 0, 0];
+    if (tReal < 2.2) {
+      const k = inv(0.3, 2.1, tReal);
+      rip = [960, 540, 60 + 1400 * eOutSine(k), (1 - k) * 1.1];
+    } else if (t >= 13.0) {
+      const k = inv(13.0, 14.8, t);
+      rip = [ANS_MORPH.centerX, 490, 60 + 1450 * eOutSine(k), (1 - k) * 1.25];
+    }
+    gl.uniform4fv(L.uRipple, rip);
+    gl.uniform3fv(L.uBase, hex(PAL.base));
+    gl.uniform1f(L.uGain, 0.96 + 0.06 * seg(t, 13.0, 14.5));
+    gl.uniform1f(L.uWarp, 145);
+    gl.uniform3fv(L.uCamO, O);
+    gl.uniform1f(L.uF, F_LEN);
+
+    const SC = [], SU = [], SV = [], SN = [], SH = [];
+    states.forEach(({ s }) => {
+      SC.push(...s.C); SU.push(...s.U); SV.push(...s.V); SN.push(...s.N);
+      SH.push(s.half[0], s.half[1], s.r, s.op);
+    });
+    gl.uniform3fv(L.uSC, SC); gl.uniform3fv(L.uSU, SU); gl.uniform3fv(L.uSV, SV); gl.uniform3fv(L.uSN, SN); gl.uniform4fv(L.uSH, SH);
+    gl.uniform1f(L.uMotes, 1.0);
+    draw();
+  }
+
+  let cur = T.sceneA;
+
+  const hasGlyph = drawForegroundAndGlyphs(t, tReal);
+  if (hasGlyph) {
+    upload(glyphTex, glyphCv, false);
+    let L = use(P.blur, T.g1); bindTex(0, glyphTex, L.uSrc); gl.uniform2f(L.uDir, 1, 0); gl.uniform1fv(L.uOff, TAPS_GN.offs); gl.uniform1fv(L.uW, TAPS_GN.ws); gl.uniform1i(L.uN, TAPS_GN.n); draw();
+    L = use(P.blur, T.g2); bindTex(0, T.g1.tex, L.uSrc); gl.uniform2f(L.uDir, 0, 1); gl.uniform1fv(L.uOff, TAPS_GN.offs); gl.uniform1fv(L.uW, TAPS_GN.ws); gl.uniform1i(L.uN, TAPS_GN.n); draw();
+    blurInto({ tex: glyphTex, w: RW, h: RH }, T.qL, TAPS_GW);
+    blurInto(cur, T.qB, TAPS_GF);
+
+    L = use(P.glyph, T.sceneB);
+    bindTex(0, cur.tex, L.uScene);
+    bindTex(1, T.qB.tex, L.uFrost);
+    bindTex(2, glyphTex, L.uMask);
+    bindTex(3, T.g2.tex, L.uMN);
+    bindTex(4, T.qL.tex, L.uMW);
+    gl.uniform2f(L.uLight, -0.55, -0.83);
+    gl.uniform1f(L.uRefr, 34.0);
+    gl.uniform3f(L.uShadow, 6, 12, 0.38);
+    gl.uniform1f(L.uLift, 0.075);
+    const pk = 0.88 * seg(t, 13.0, 13.8);
+    gl.uniform4f(L.uPool, ANS_MORPH.centerX + 20, 480, 500, 210);
+    gl.uniform3f(L.uPoolK, pk, 170, 240);
+    gl.uniform3f(L.uHalo, 0.36, 1.02, 1.32);
+    gl.uniform1f(L.uSat, 1.38);
+    const ks = inv(13.5, 14.6, t);
+    gl.uniform3f(L.uSweep, lerp(-580, 580, eInOutCubic(ks)), 80, ks > 0 && ks < 1 ? 0.38 * Math.sin(Math.PI * ks) : 0);
+    draw();
+    cur = T.sceneB;
+  }
+
+  const order = states.filter(({ s }) => s.op > 0.001).sort((a, b) => (b.s.C[2] - a.s.C[2]));
+  for (const { c, s } of order) {
+    blurInto(cur, T.qB, TAPS_FROST);
+    const L = use(P.card, cur);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform3fv(L.uCamO, O);
+    gl.uniform1f(L.uF, F_LEN);
+    gl.uniform3fv(L.uC, s.C);
+    gl.uniform3fv(L.uU, s.U);
+    gl.uniform3fv(L.uV, s.V);
+    gl.uniform3fv(L.uN, s.N);
+    gl.uniform2f(L.uHalf, s.half[0], s.half[1]);
+    gl.uniform1f(L.uRad, s.r);
+    gl.uniform1f(L.uOpacity, s.op);
+    gl.uniform1f(L.uDefocus, s.defocus);
+    gl.uniform1f(L.uContentA, s.contentA);
+    gl.uniform1f(L.uLod, s.lod);
+    gl.uniform1f(L.uFrost, s.frost);
+    gl.uniform2f(L.uLight, -0.55, -0.83);
+    gl.uniform1f(L.uSheen, s.sheen);
+    gl.uniform2f(L.uGlint, s.glint[0], s.glint[1]);
+    gl.uniform1f(L.uEdge, s.edge);
+    gl.uniform2f(L.uCatch, s.catchL[0], s.catchL[1]);
+    bindTex(0, T.qB.tex, L.uBlurTex);
+    bindTex(1, c.tex, L.uContent);
+    draw();
+    gl.disable(gl.BLEND);
+  }
+
+  upload(overTex, overCv, false);
+  {
+    const L = use(P.over, cur);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    bindTex(0, overTex, L.uTex);
+    gl.uniform1f(L.uA, 1.0);
+    draw();
+    gl.disable(gl.BLEND);
+  }
+
+  const lens = getLensState(t);
+  blurInto(cur, T.qL, TAPS_LENS);
+  {
+    const L = use(P.lens, T.lens);
+    bindTex(0, cur.tex, L.uScene);
+    bindTex(1, T.qL.tex, L.uBlur);
+    gl.uniform1f(L.uOn, lens.on || 0);
+    if (lens.on > 0) {
+      gl.uniform2f(L.uLC, lens.c[0], lens.c[1]);
+      gl.uniform2f(L.uLH, lens.hx, lens.hy);
+      gl.uniform1f(L.uLR, lens.r);
+      gl.uniformMatrix2fv(L.uLM, false, new Float32Array(lens.M));
+      gl.uniform3f(L.uBead, lens.bead[0], lens.bead[1], lens.bead[2]);
+      gl.uniform1f(L.uBeadK, lens.beadK);
+      gl.uniform1f(L.uBeadA, lens.beadA);
+      gl.uniform1f(L.uBezel, lens.bezel);
+      gl.uniform1f(L.uDepth, lens.bezel * 0.9);
+      gl.uniform1f(L.uIor, 1.5);
+      gl.uniform1f(L.uDisp, 0.22);
+      gl.uniform1f(L.uMag, lens.mag);
+      gl.uniform1f(L.uRefrSign, -1);
+      gl.uniform1f(L.uMaxDisp, lens.bezel * 0.85);
+      gl.uniform1f(L.uRimGlow, 1.8);
+      gl.uniform1f(L.uRing, 0.38);
+      if (L.uHide) gl.uniform1f(L.uHide, 0);
+      gl.uniform1f(L.uRingW, lens.ringW);
+      gl.uniform1f(L.uWarm, lens.warm);
+      gl.uniform1f(L.uCW, lens.cw);
+      gl.uniform2f(L.uRGl, lens.rgl[0], lens.rgl[1]);
+      gl.uniform3f(L.uWave, lens.wave[0], lens.wave[1], lens.wave[2]);
+      gl.uniform1f(L.uCaustic, 0.22 * lens.lift);
+      gl.uniform1f(L.uLift, lens.lift);
+      gl.uniform1f(L.uGlint, lerp(-1.8, 1.8, (tReal * 0.35) % 1));
+      gl.uniform3f(L.uLight3, -0.5, -0.78, 0.62);
+      gl.uniform1f(L.uFrostRim, 0.10);
+      gl.uniform1f(L.uFres, 0.25);
+      gl.uniform1f(L.uBzExp, 2.5);
+    }
+    draw();
+  }
+
+  blurInto(T.lens, T.qB, TAPS_BLOOM, 0.62);
+  {
+    const L = use(P.final, null);
+    bindTex(0, T.lens.tex, L.uSrc);
+    bindTex(1, T.qB.tex, L.uBloom);
+    bindTex(2, grainTex, L.uGrain);
+    gl.uniform1f(L.uBloomAmt, 0.20);
+    gl.uniform1f(L.uGrainAmt, 0.08);
+    gl.uniform1f(L.uFrame, frame);
+    gl.uniform1f(L.uVig, 0.18);
+    gl.uniform1f(L.uFade, 1.0);
+    draw();
+  }
+  gl.finish();
+}
+
+window.renderAt = renderFrame;
+window.__seek = renderFrame;
+
+await renderFrame(2.5);
+window.__ready = true;
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+/* Local macOS font fallbacks so document.fonts.load() succeeds with zero NetworkError when external TTFs are absent */
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  src: local('PingFang SC Semibold'), local('PingFang SC'), local('Heiti SC'), local('Helvetica Neue');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Alibaba PuHuiTi';
+  src: local('PingFang SC Semibold'), local('PingFang SC'), local('Heiti SC');
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: local('PingFang SC'), local('Heiti SC');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Resource Han Rounded';
+  src: local('PingFang SC Semibold'), local('Arial Rounded MT Bold'), local('PingFang SC');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Inter';
+  src: local('SF Pro Display'), local('Helvetica Neue'), local('Arial');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Sora';
+  src: local('SF Pro Display'), local('Helvetica Neue'), local('Arial');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Unbounded';
+  src: local('Arial Black'), local('Helvetica Neue Bold'), local('SF Pro Display Bold'), local('PingFang SC Semibold');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('SF Mono'), local('Menlo'), local('Monaco'), local('Courier New');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: local('SF Mono'), local('Menlo'), local('Monaco'), local('Courier New');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: block;
+}
