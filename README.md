@@ -1,33 +1,47 @@
-# ANS (`AI Never Stops`) 官方网站实机导览宣传片 · 跨电脑复利开发工程 (`ans-brand-film-studio`)
+# ANS (`AI Never Stops`) 宣传片与手绘动画 · 跨电脑复利开发总仓 (`ans-brand-film-studio`)
 
-本仓库/压缩包完整封装了 **ANS（唯一官方全称：`AI Never Stops`，主站 `https://ans.cauai.fun`）** 官方网站实机导览宣传片（`121.96s` · `1920×1080` · `30fps` · `3,659 帧`）的全部源码、预缓存真站与 3D 小恐龙序列帧、17 句 `Fish Audio Drama-3` 原声与混音母带、确定性渲染器（`harness/render.mjs`）以及沉淀好的三大可复利 Skill。
+本仓库完整封装了 **ANS（唯一官方全称：`AI Never Stops`，主站 `https://ans.cauai.fun`）** 两条核心视频复利管线的全部源码、角色绑定、预缓存素材与四大可复利 Skill：
+1. **管线一（手绘水彩双主角卡通动画 · V4.6 定稿版）**：基于 `ClaudeAnimationBase`（`p5.js` + `p5.brush` 双画布引擎），内置 V4.6 定稿双主角绑定（**宽胖圆滚站立 ANS 小恐龙 `dino`** + **还原真实照片青年神韵、多彩花冠、双梁中空大黑框眼镜、胸前印有 `ANS` 白 T 恤的主理人「我」`creator`**）与 `🟢 Day 01 / 28 · ANS 正式上线` 15 秒 5 幕完整分镜。
+2. **管线二（官方网站实机导览宣传片 · 60分基线版）**：`121.96s` · `1920×1080` · `30fps` 全站实机导览工程（含预缓存真站长图、3D 小恐龙 36 帧互动序列、17 句 `Fish Audio Drama-3` 原声与混音母带）。
 
 ---
 
 ## 一、 换电脑后 30 秒快速恢复开发环境
 
-### 方式 A：直接从 GitHub 克隆（推荐）
+### 1. 恢复「手绘水彩双主角动画 (`ClaudeAnimationBase` · V4.6)」环境
 ```bash
 git clone https://github.com/1008611-creater/ans-brand-film-studio.git
-cd ans-brand-film-studio/.agents/skills/mg-styles-15
+cd ans-brand-film-studio/ClaudeAnimationBase
 npm install
+
+# 一键渲染 V4.6 双主角 6 态设定图（约 4 秒）
+node render.mjs --loop=ans_sheet --sheet=0.4 --cols=1 --w=1280 --out=out/check/ans_chars_sheet.jpg
+
+# 一键渲染 Day 01 / 28 五幕核心关键帧静帧图（约 10 秒）
+node render.mjs --stills=1.8,4.6,7.6,10.5,13.6 --out=out/ans_day01_stills
+
+# 一键渲染 720p · 24fps 完整 15 秒 MP4 视频
+node render.mjs --out=out/ans_day01_720p.mp4
 ```
 
-### 方式 B：解压便携压缩包 (`ans-brand-film-portable-kit.zip`)
+### 2. 恢复「官网实机导览宣传片 (`mg-styles-15`)」环境
 ```bash
-unzip ans-brand-film-portable-kit.zip -d ans-brand-film-studio
 cd ans-brand-film-studio/.agents/skills/mg-styles-15
 npm install
 ```
 
-> **将沉淀好的可复利 Skill 同步到新电脑全局目录（可选）：**
-> ```bash
-> mkdir -p ~/.gemini/config/skills ~/.codex/skills
-> cp -R .agents/skills/ans-brand-film-live-tour ~/.gemini/config/skills/
-> cp -R .agents/skills/ans-brand-film-live-tour ~/.codex/skills/
-> cp -R .agents/skills/mg-styles-15 ~/.gemini/config/skills/
-> cp -R .agents/skills/mg-styles-15 ~/.codex/skills/
-> ```
+### 3. 将沉淀好的四大可复利 Skill 同步到新电脑全局目录（推荐执行）
+```bash
+mkdir -p ~/.gemini/config/skills ~/.codex/skills
+cp -R .agents/skills/ans-p5-brush-cartoon-animation ~/.gemini/config/skills/
+cp -R .agents/skills/ans-p5-brush-cartoon-animation ~/.codex/skills/
+cp -R .agents/skills/ans-brand-film-live-tour ~/.gemini/config/skills/
+cp -R .agents/skills/ans-brand-film-live-tour ~/.codex/skills/
+cp -R .agents/skills/ans-hyperframes-launch-video ~/.gemini/config/skills/
+cp -R .agents/skills/ans-hyperframes-launch-video ~/.codex/skills/
+cp -R .agents/skills/mg-styles-15 ~/.gemini/config/skills/
+cp -R .agents/skills/mg-styles-15 ~/.codex/skills/
+```
 
 ---
 
@@ -36,52 +50,30 @@ npm install
 ```text
 ans-brand-film-studio/
 ├── README.md                                   # 跨电脑快速恢复指南与命令速查
-├── HANDOFF-PROMPT.md                           # 换电脑后直接粘贴给 AI 的无缝续写提示词
+├── HANDOFF-PROMPT.md                           # 换电脑后直接粘贴给 AI 的无缝续写提示词（含双管线）
+├── ClaudeAnimationBase/                        # ★ 管线一：p5.js + p5.brush 手绘水彩双主角动画工程 (V4.6 定稿)
+│   ├── STORYBOARD.md                           # Day 01 / 28 五幕完整文案、分镜脚本与时间轴
+│   ├── render.mjs                              # Puppeteer + FFmpeg 确定性渲染器
+│   ├── studio.html                             # WebGL + 2D 双画布加载入口 (含中英文手写字体)
+│   ├── src/
+│   │   ├── ans_chars.js                        # ★ V4.6 双主角手绘绑定库 (宽胖短腿小恐龙 dino + 青年神韵 ANS 白T恤 creator)
+│   │   ├── scenes/ans_day01.js                 # ★ Day 01 / 28 五幕完整场景与动画状态机
+│   │   ├── sheets.js                           # ans_sheet 双主角 6 种神态同屏设定图循环
+│   │   ├── core.js                             # p5.brush 水彩晕染 + 样条墨线 + 2D 文字层核心
+│   │   └── config.js                           # 1280x720 @ 24fps, 15s 配置
+│   └── out/
+│       ├── check/ans_chars_sheet.jpg           # V4.6 双主角 6 态设定图成品
+│       └── ans_day01_stills/t*.png             # V4.6 五幕分镜关键帧成品 (t1_80..t13_60.png)
 └── .agents/skills/
-    ├── ans-brand-film-live-tour/               # ★ 本项目专属复利 Skill（6 大铁律 + 生产脚本）
+    ├── ans-p5-brush-cartoon-animation/         # ★ 新增：p5.js + p5.brush 双主角手绘水彩动画复利 Skill (V4.6)
+    │   ├── SKILL.md
+    │   ├── scripts/                            # ans_chars.js, ans_day01.js, sheets.js, render.mjs
+    │   └── references/                         # STORYBOARD.md, ans_chars_sheet_v46.jpg, stills/t*.png
+    ├── ans-brand-film-live-tour/               # ★ 官网实机导览宣传片复利 Skill（60分基线版）
     │   ├── SKILL.md
     │   ├── scripts/gen_audio.py
     │   ├── scripts/capture_live_tour.mjs
     │   └── references/clauses_timeline.json
     ├── ans-hyperframes-launch-video/           # ANS 瑞士网格 60 分合格基线 Skill
-    └── mg-styles-15/                           # 纯代码动态设计权威渲染引擎
-        ├── SKILL.md
-        ├── harness/render.mjs                  # 无头 Chrome 确定性逐帧 + 子快门运动模糊渲染器
-        ├── lib/audio/mgaudio/                  # Python 配乐与音效合成库
-        ├── references/ans-live-tour-film-playbook.md
-        └── demos/ans-brand-film/               # ★ 当前 121.96s 官方宣传片工程目录
-            ├── index.html                      # 1920x1080 主渲染舞台 (window.__seek / renderAt)
-            ├── shaders.js                      # WebGL2 极光流体背景与毛玻璃折射 Shader
-            ├── gen_audio.py                    # 17句 Drama-3 语音 + 瑞士风 Lo-Fi BGM 闪避混音脚本
-            ├── capture_live_tour.mjs           # 真站黑名单净化截图 + 3D 小恐龙 36 帧预缓存脚本
-            ├── clauses_timeline.json           # 17 句口播=字幕 100% 逐字对齐时间轴
-            ├── timeline_data.js                # 供 index.html 加载的时间轴 JS 模块
-            ├── clauses_tts/                    # 已缓存的 17 句 Fish Audio Drama-3 语音文件
-            ├── assets/
-            │   ├── tour/                       # 预缓存真站长图 (explore/vibehub/market/teams/competitions/hubs) + dino_00..35.webp
-            │   ├── sfx/lofi-study_fassounds.mp3# 瑞士风 60 分合格版同款 Lo-Fi BGM
-            │   ├── mascot/ans-mascot.png       # 站内真实薄荷绿小恐龙原图
-            │   └── covers/                     # 干净官方项目封面
-            └── out/
-                ├── audio.wav                   # 已混音母带 (-15.0 LUFS / -1.5 dBTP)
-                ├── audio_spec.png              # 音频波形与 Mel 频谱图
-                ├── stills/t*.png               # 11 张 1080p 关键帧静帧大图
-                └── ans-brand-film-1080p.mp4    # 当前 121.96s 1080p 30fps 成片
-```
-
----
-
-## 三、 常用迭代命令
-
-```bash
-cd .agents/skills/mg-styles-15
-
-# 1. 快速导出 11 张关键时间点 1080p 静帧（约 10 秒），检查画面排版与镜头聚焦
-node harness/render.mjs demos/ans-brand-film --stills=9.0,23.0,36.0,46.5,53.0,61.0,68.5,76.0,98.5,105.0,119.5 --motion-blur=1
-
-# 2. 若修改了某句台词或混音参数，重新生成 audio.wav 与 timeline_data.js（未改动的句子自动复用 clauses_tts/ 缓存）
-python3 demos/ans-brand-film/gen_audio.py
-
-# 3. 全量渲染 1080p 30fps 完整视频
-node harness/render.mjs demos/ans-brand-film --audio=demos/ans-brand-film/out/audio.wav --motion-blur=1
+    └── mg-styles-15/                           # 纯代码动态设计权威渲染引擎 + demos/ans-brand-film/
 ```

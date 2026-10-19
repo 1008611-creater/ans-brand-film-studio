@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ANS · AI Never Stops — Day 01 / 28 Studio (p5.js + p5.brush)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=ZCOOL+KuaiLe&display=block">
+<style>
+  html, body { margin: 0; background: #1b1820; color: #eee; font: 13px system-ui, sans-serif; }
+  main { padding: 12px; display: grid; gap: 8px; }
+  #out { width: min(100%, 1280px); aspect-ratio: 16 / 9; height: auto; background: #F3EBDC; }
+  .p5Canvas { display: none !important; }
+  .bar { display: flex; gap: 10px; align-items: center; max-width: 1280px; }
+  #scrub { flex: 1; }
+  #tt { font-variant-numeric: tabular-nums; min-width: 190px; }
+</style>
+<script src="node_modules/p5/lib/p5.min.js"></script>
+<script src="node_modules/p5.brush/dist/p5.brush.js"></script>
+</head>
+<body>
+<main>
+  <canvas id="out" width="1280" height="720"></canvas>
+  <div class="bar"><input id="scrub" type="range" min="0" max="15" step="0.0417" value="0"><span id="tt">loading…</span></div>
+</main>
+<!-- engine -->
+<script src="src/config.js"></script>
+<script src="src/core.js"></script>
+<script src="src/clawd.js"></script>
+<script src="src/ans_chars.js"></script>
+<script src="src/timeline.js"></script>
+<!-- reference sheets (standalone loops) -->
+<script src="src/sheets.js"></script>
+<!-- ANS Day 01 / 28 hand-painted p5.brush video -->
+<script src="src/scenes/ans_day01.js"></script>
+<script>
+  const q = new URLSearchParams(location.search).get('loop'); if (q && LOOPS[q]) window.LOOP = LOOPS[q];
+</script>
+</body>
+</html>
