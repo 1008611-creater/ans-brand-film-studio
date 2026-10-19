@@ -6,6 +6,24 @@
 
 ---
 
+## 〇、 复利归档总索引（V4.6 双主角动画 · 换电脑先看这里）
+
+| 资产 | 归档位置 | 状态 |
+| :--- | :--- | :--- |
+| 复利总仓（工程 + 素材 + Skill） | 本仓库 `main`（V4.6 基线提交 `69d5887`） | ✅ 已推送 |
+| 手绘动画工程 | `ClaudeAnimationBase/`（`src/ans_chars.js`、`src/scenes/ans_day01.js`、`src/sheets.js`、`STORYBOARD.md`、`render.mjs`） | ✅ 已入库 |
+| 定稿素材 | `ClaudeAnimationBase/out/check/ans_chars_sheet.jpg` + `ClaudeAnimationBase/out/ans_day01_stills/t*.png` | ✅ 已入库 |
+| 专属复利 Skill | `.agents/skills/ans-p5-brush-cartoon-animation/`（SKILL.md + scripts/ + references/，12 个文件） | ✅ 已入库 |
+| 交接图文源稿（飞书同一源稿） | `ANS-Day01-P5Brush-Skill-Workflow-Handoff.md` | ✅ 已入库 |
+| 飞书一键导入包（无需装 Python） | `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` | ✅ 已入库 |
+| 飞书在线云文档（V1，含内嵌高清设定图与 5 幕关键帧） | https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb | ✅ 在线 |
+| ANS 主站仓库 Skill 备份 | https://github.com/1008611-creater/ans-platform 分支 `feat/dev3-ans-skill-refactor`（提交 `cbfad813`）路径 `ai-video-skills-source/ans-p5-brush-cartoon-animation/` | ✅ 与总仓 12 个文件 blob 逐一校验一致 |
+| 跨电脑便携压缩包 | `ans-p5-brush-cartoon-v46-portable-kit.zip`（约 30 MB，含工程 + 素材 + Skill + 本交接文档） | ✅ 已生成 |
+
+> 更新飞书云文档：在飞书云盘点「上传 → 导入为在线文档 → Microsoft Word」选择 `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` 即可（约 10 秒，图片自动内嵌）。修改图文内容后请同步更新 `.md` 与 `.docx` 两个文件，保持「仓库源稿 = 飞书文档」一致。
+
+---
+
 ## 一、 换电脑后 30 秒快速恢复开发环境
 
 ### 1. 恢复「手绘水彩双主角动画 (`ClaudeAnimationBase` · V4.6)」环境
@@ -41,6 +59,17 @@ cp -R .agents/skills/ans-hyperframes-launch-video ~/.gemini/config/skills/
 cp -R .agents/skills/ans-hyperframes-launch-video ~/.codex/skills/
 cp -R .agents/skills/mg-styles-15 ~/.gemini/config/skills/
 cp -R .agents/skills/mg-styles-15 ~/.codex/skills/
+```
+
+Windows（PowerShell）等价命令：
+
+```powershell
+$skills = @("ans-p5-brush-cartoon-animation","ans-brand-film-live-tour","ans-hyperframes-launch-video","mg-styles-15")
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\config\skills","$env:USERPROFILE\.codex\skills" | Out-Null
+foreach ($s in $skills) {
+  Copy-Item ".agents\skills\$s" "$env:USERPROFILE\.gemini\config\skills" -Recurse -Force
+  Copy-Item ".agents\skills\$s" "$env:USERPROFILE\.codex\skills" -Recurse -Force
+}
 ```
 
 ---
