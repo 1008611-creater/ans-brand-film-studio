@@ -34,7 +34,7 @@
 - 交接文档：`README.md`（跨电脑恢复指南）、`HANDOFF-PROMPT.md`（无缝续写提示词）、本文件 `ANS-Day01-P5Brush-Skill-Workflow-Handoff.md`（飞书源稿）
 
 ### 2. ANS 主站仓库（ans-platform）Skill 备份
-- 仓库地址：https://github.com/1008611-creater/ans-platform （分支：`feat/dev3-ans-skill-refactor`，提交：`cbfad813`）
+- 仓库地址：https://github.com/1008611-creater/ans-platform （分支：`feat/dev3-ans-skill-refactor`，最新提交以远端分支为准）
 - Skill 归档路径：`ai-video-skills-source/ans-p5-brush-cartoon-animation/`（SKILL.md、scripts/*、references/*）
 
 ### 3. 本机多端 Skill 同步路径与便携压缩包（Windows 实机核对）

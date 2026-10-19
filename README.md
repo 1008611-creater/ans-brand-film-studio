@@ -18,7 +18,7 @@
 | 飞书一键导入包（无需装 Python） | `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` | ✅ 已入库 |
 | 飞书在线云文档 **V2（当前版**，含内嵌高清设定图与 5 幕关键帧） | https://narcb9vct6.feishu.cn/wiki/EaHAwTrKQiwR4akgb9OcTZi3nAh | ✅ 2026-10-20 上传并回读核对 |
 | 飞书在线云文档 V1（初版，保留可查） | https://narcb9vct6.feishu.cn/wiki/EcBsw9QWzigqIVkBQnKcf8sQnvb | ✅ 在线 |
-| ANS 主站仓库 Skill 备份 | https://github.com/1008611-creater/ans-platform 分支 `feat/dev3-ans-skill-refactor`（提交 `cbfad813`）路径 `ai-video-skills-source/ans-p5-brush-cartoon-animation/` | ✅ 与总仓 12 个文件 blob 逐一校验一致 |
+| ANS 主站仓库 Skill 备份 | https://github.com/1008611-creater/ans-platform 分支 `feat/dev3-ans-skill-refactor` 路径 `ai-video-skills-source/ans-p5-brush-cartoon-animation/`（最新提交以远端分支为准） | ✅ 与总仓 12 个文件 blob 逐一校验一致 |
 | 跨电脑便携压缩包 | `ans-p5-brush-cartoon-v46-portable-kit.zip`（约 30 MB，含工程 + 素材 + Skill + 本交接文档） | ✅ 已生成 |
 
 > 更新飞书云文档：在飞书云盘点「上传 → 导入为在线文档 → Microsoft Word」选择 `ANS-Day01-P5Brush-Skill-Workflow-Handoff.feishu-import.docx` 即可（约 10 秒，图片自动内嵌）。修改图文内容后请同步更新 `.md` 与 `.docx` 两个文件，保持「仓库源稿 = 飞书文档」一致。
