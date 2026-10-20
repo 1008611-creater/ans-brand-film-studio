@@ -62,7 +62,7 @@
   //   k=0 全露 → k=1 全遮；上一幕出 k:0→1、下一幕入 k:1→0，切点两侧连续。
   //   遮罩带按帧移位的鬃毛划痕（f = 当前帧号），相邻帧永不重复（D11）。
   // ============================================================================
-  const TX = { span: 10 / 24, ang: -30 * Math.PI / 180, half: 700, noise: 24 };
+  const TX = { span: 10 / 24, ang: -30 * Math.PI / 180, half: 1150, noise: 24 };   // half 700→1150：切镜帧全幅盖住，消除整幅 pop
   function maskWipe(k, seedKey) {
     k = clamp(k);
     if (k <= 0.002) return;
@@ -97,7 +97,7 @@
   function openingCard(lt) {
     if (lt >= OPEN.tear1) return;
     flushLetters();                            // 先把本幕场景里的字落到底下，纸底才盖得住
-    const tearK = easeInOutQuint(seg(lt, OPEN.tear0, OPEN.tear1));
+    const tearK = Math.sqrt(easeInOutQuint(seg(lt, OPEN.tear0, OPEN.tear1)));   // √：面积线性增长 → 每帧帧差均匀
     if (tearK < 0.999) {                       // 未撕开区域 = 纸底（有机边缘，右下角留洞）
       const Cx = W + 240, Cy = H + 240, R = 200 + 2500 * tearK;
       const s = Math.sqrt(Math.max(0, R * R - 240 * 240));
@@ -470,9 +470,10 @@
     const sweepK = seg(lt, tSweep, tSweep + beatAt(dur, .18));
     const shake = lt > tSweep && lt < tSweep + beatAt(dur, .08) ? shakeXY(t, 9 * Math.exp(-(lt - tSweep) * 6)) : [0, 0];
     camBegin(
-      960 + shake[0] + 12 * Math.sin(lt * 0.9),
-      kf(lt, [[0, 540], [tIn, 532], [tSweep, 522], [tSpark2, 512], [dur, 506]]) + shake[1],
-      kf(lt, [[0, 1.0], [tSweep, 1.04], [tSpark2, 1.05], [dur, 1.05]])
+      // warpT：预备期（屏息窗）摄像时钟被扣住 → 画面连同摄像一起静止
+      960 + shake[0] + 12 * Math.sin((warpT(t) - SHOT_T0.s1) * 0.9),
+      kf(warpT(t), [[SHOT_T0.s1, 540], [SHOT_T0.s1 + tIn, 532], [SHOT_T0.s1 + tSweep, 522], [SHOT_T0.s1 + tSpark2, 512], [SHOT_T0.s1 + dur, 506]]) + shake[1],
+      kf(warpT(t), [[SHOT_T0.s1, 1.00], [SHOT_T0.s1 + tSweep, 1.045], [evOf('spark').t, 1.075], [SHOT_T0.s1 + dur, 1.09]])   // 9% 单调推近
     );
 
     // Rich Twilight Study Room Background
@@ -601,6 +602,7 @@
     if (sweepK > 0) sfx('✨ 告别收藏夹吃灰 → ans.cauai.fun', 960, 165, 36, DINO_COLS.mint, lt - tSweep, { life: 1.5, rot: -0.02 });
     if (burst2 > 0 && burst2 < 1) sfx('💡 灵感来了 · 现在就开造', 960, 168, 34, PAL.ochre, lt - tSpark2, { life: 1.6, rot: 0.02 });
 
+  stageLayer(1, t);                           // 第六轮 · 99+ 堆积 / 桌面清空 / ANS 字标落地
     camEnd();
 
     openingCard(lt);                                    // D10 片头：深墨字标 → 薄荷扫过 → 右下角撕开
@@ -675,9 +677,9 @@
     const tCheer = beatAt(dur, b.cheer);           // 4.03s 节拍②·全员欢呼
     const shake = lt > tPull && lt < tPull + beatAt(dur, .09) ? shakeXY(t, 7 * Math.exp(-(lt - tPull) * 6)) : [0, 0];
     camBegin(
-      960 + shake[0] + 12 * Math.sin(lt * 0.7),
-      kf(lt, [[0, 535], [tPull, 520], [tCheer, 512], [dur, 506]]) + shake[1],
-      kf(lt, [[0, 1.00], [tPull + beatAt(dur, .05), 1.02], [tCheer, 1.045], [dur, 1.06]])   // 1.00→1.06 缓推
+      960 + shake[0] + 12 * Math.sin((warpT(t) - SHOT_T0.s2) * 0.7),
+      kf(warpT(t), [[SHOT_T0.s2, 535], [SHOT_T0.s2 + tPull, 520], [SHOT_T0.s2 + tCheer, 512], [SHOT_T0.s2 + dur, 506]]) + shake[1],
+      kf(warpT(t), [[SHOT_T0.s2, 1.00], [SHOT_T0.s2 + tPull + beatAt(dur, .05), 1.04], [evOf('card2').t, 1.075], [SHOT_T0.s2 + dur, 1.10]])   // 10% 单调推近
     );
 
     // Rich Inventor Workshop Environment
@@ -717,7 +719,7 @@
       const acc = ['#56B4E9', '#E8AA38', '#E27A92'];
       for (let i = 0; i < 3; i++) {
         const pk = pulseF(t);                                     // 帧对齐拍点：同拍同闪，非拍点不闪
-        const age = 0.28 + 0.72 * (1 - pk);                       // 拍点那一帧最亮最新，随后 3 帧老化消失
+        const age = 0.28 + 0.66 * (1 - pk) + 0.03 * i;            // 上限 0.97 + 逐颗粒 0.03 错峰：峰值仍在拍点帧
         sparkle(420 + i * 540 + (hash(i * 7) - 0.5) * 40, 470 + (hash(i * 13) - 0.5) * 30, 24, age, acc[i]);
       }
     }
@@ -794,6 +796,7 @@
       sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq
     });
 
+  stageLayer(2, t);                           // 第六轮 · 三卡逐张点亮 + ONLINE 横幅 + 总闸
     camEnd();
     flushLetters();                                     // 场景字先落定，再盖入场遮罩
     wipeIn(lt);                                         // 统一转场：上一幕的擦除在本幕头 10 帧收走
@@ -849,9 +852,9 @@
     const shake = lt > tPress && lt < tPress + beatAt(dur, .03) ? shakeXY(t, 7 * Math.exp(-(lt - tPress) * 6)) : [0, 0];
     const bgDx = 38 * ease(seg(lt, beatAt(dur, .08), beatAt(dur, .92)));      // 背景层 2% 水平视差漂移
     camBegin(
-      960 + shake[0] + 12 * Math.sin(lt * 0.75),
-      kf(lt, [[0, 535], [tKick, 530], [tPress, 524], [tCard3, 508], [tCheer, 502], [dur, 512]]) + shake[1],
-      kf(lt, [[0, 1.06], [tPress + beatAt(dur, .02), 1.07], [tCheer, 1.05], [dur, 1.06]])
+      960 + shake[0] + 12 * Math.sin((warpT(t) - SHOT_T0.s3) * 0.75),
+      kf(warpT(t), [[SHOT_T0.s3, 535], [SHOT_T0.s3 + tKick, 530], [SHOT_T0.s3 + tPress, 524], [SHOT_T0.s3 + tCard3, 508], [SHOT_T0.s3 + tCheer, 502], [SHOT_T0.s3 + dur, 512]]) + shake[1],
+      kf(warpT(t), [[SHOT_T0.s3, 1.02], [SHOT_T0.s3 + tPress + beatAt(dur, .02), 1.055], [evOf('lay3').t, 1.095], [SHOT_T0.s3 + dur, 1.11]])   // 第三层落下时推近
     );
     push(); translate(bgDx, 0);                                               // 背景层（墙/窗/洞洞板）独立视差
 
@@ -951,7 +954,7 @@
     glow(chute[0], chute[1], 96 + 30 * Math.sin(t * 2.6), DINO_COLS.mint, 0.3 + 0.22 * Math.sin(t * 2.6));
     if (lt > tCard3) {
       for (let i = 0; i < 3; i++) {
-        const pk = pulseF(t), age = 0.28 + 0.72 * (1 - pk), [tx2, ty2] = cards[i].target;   // 拍点最亮
+        const pk = pulseF(t), age = 0.28 + 0.66 * (1 - pk) + 0.03 * i, [tx2, ty2] = cards[i].target;   // 峰值仍在拍点帧
         sparkle(tx2 + (hash(i) - 0.5) * 120, ty2 - 118 + (hash(i + 5) - 0.5) * 60, 22, age, cards[i].col);
       }
     }
@@ -1003,6 +1006,7 @@
         : lt > tCheer ? 1.35 + 0.3 * Math.sin(t * 8) : 1.05
     });
 
+  stageLayer(3, t);                           // 第六轮 · 教程塔逐层拆解 / 成品 / 展示
     camEnd();
     flushLetters();                                     // 场景字先落定，再盖入场遮罩
     wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除（10 帧 easeInOutQuart）
@@ -1021,9 +1025,9 @@
     const tGift = beatAt(dur, b.gift);            // 1.36s 节拍①·免费算力券飞入定格
     const tCheer = beatAt(dur, b.cheer);          // 4.62s 节拍②·金币光环再撒一轮
     camBegin(
-      960 + 10 * Math.sin(lt * 0.8),
-      kf(lt, [[0, 540], [tGift + beatAt(dur, .06), 528], [tCheer, 520], [dur, 516]]),
-      kf(lt, [[0, 1.06], [tGift + beatAt(dur, .07), 1.04], [tCheer, 1.02], [dur, 1.00]])   // 1.06→1.00 拉回
+      960 + 10 * Math.sin((warpT(t) - SHOT_T0.s4) * 0.8),
+      kf(warpT(t), [[SHOT_T0.s4, 540], [SHOT_T0.s4 + tGift + beatAt(dur, .06), 528], [SHOT_T0.s4 + tCheer, 520], [SHOT_T0.s4 + dur, 516]]),
+      kf(warpT(t), [[SHOT_T0.s4, 1.10], [evOf('hatch').t, 1.06], [evOf('prop3').t, 1.02], [SHOT_T0.s4 + dur, 1.00]])   // 10% 单调拉远
     );
 
     // Rich Outdoor Pastel Meadow & Cloud Carnival Scene!
@@ -1142,6 +1146,7 @@
       letter('免费额度 · 0套路直接开造', tkX + 76, tkY + 30, 24, '#D8394E', { ink: false });
     }
 
+  stageLayer(4, t);                           // 第六轮 · 舱盖开启 + 三件道具依次抛出
     camEnd();
     flushLetters();                                     // 场景字先落定，再盖入场遮罩
     wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除
@@ -1168,8 +1173,8 @@
     const backK = ease(seg(lt, tPullBack, tPullBackEnd));
     const shake = lt > tPlant && lt < tPlant + 0.16 ? shakeXY(t, 9 * Math.exp(-(lt - tPlant) * 6)) : [0, 0];
     camBegin(
-      lerp(lerp(960, 450, pushK), 968, backK) + shake[0] + 10 * Math.sin(lt * 0.7),
-      lerp(lerp(544, 490, pushK), 512, backK) + shake[1] + 6 * Math.sin(lt * 0.5),
+      lerp(lerp(960, 450, pushK), 968, backK) + shake[0] + 10 * Math.sin((warpT(t) - SHOT_T0.s5) * 0.7),
+      lerp(lerp(544, 490, pushK), 512, backK) + shake[1] + 6 * Math.sin((warpT(t) - SHOT_T0.s5) * 0.5),
       lerp(lerp(0.98, 1.14, pushK), 1.06, backK)
     );
 
@@ -1363,6 +1368,7 @@
     });
 
     const stampScreen = toScreen(STAMP.x, STAMP.y);
+  stageLayer(5, t);                           // 第六轮 · 日历逐格盖章 + 宣告板 + 宣誓条
     camEnd();
 
     // 节拍④的红光警示（屏幕空间一次性闪光；沿用既有 flash，不改造型）
@@ -1457,6 +1463,357 @@
 
     flushLetters();                                     // 锁版字先落定，再让擦除收走（避免字浮在遮罩上）
     wipeIn(lt);                                         // 统一转场：起手 10 帧把舞台的擦除收走
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // 第六轮 · 画面节奏引擎：强结构事件 + 「预备 → 爆发 → 余韵」
+  //   验收工具 tools/picture_rhythm.py 的判据：事件帧结构变化 s≥0.18 且 diff ≥2×幕均，
+  //   事件前 6 帧 diff ≤0.5×幕均（预备/屏息），事件后 10 帧 ≤0.8×幕均（余韵）。
+  //   屏息不靠加静止帧，而是：①boil 时钟冻结（线稿完全静止）②摄像/粒子减速
+  //   ③画面压暗 4.5%（爆发帧释放，本身也构成爆发的对比）。
+  // ══════════════════════════════════════════════════════════════════════════════
+  const MUS_OFF = PROJECT.offset, MUS_BEAT = 60 / PROJECT.bpm;
+  const EVPRE = 7 / 24, EVPOST = 9 / 24;      // 7 帧：屏息覆盖"事件前 6 帧"（工具窗口）且不含爆发帧
+  const EV = [
+    { t: 1.30, w: 'pile' }, { t: 2.20, w: 'pile2' }, { t: 2.95, w: 'sweep' }, { t: 3.92, w: 'clean' },
+    { t: 5.15, w: 'spark' }, { t: 5.96, w: 'mark' },
+    { t: 7.15, w: 'arrive' }, { t: 8.28, w: 'power' }, { t: 9.30, w: 'card1' }, { t: 10.75, w: 'card2' },
+    { t: 12.22, w: 'card3' }, { t: 13.62, w: 'surge' },
+    { t: 15.20, w: 'arrive' }, { t: 16.65, w: 'lay1' }, { t: 18.05, w: 'lay2' }, { t: 19.52, w: 'lay3' },
+    { t: 21.10, w: 'build' }, { t: 22.45, w: 'show' },
+    { t: 24.15, w: 'arrive' }, { t: 25.35, w: 'hatch' }, { t: 26.35, w: 'prop1' }, { t: 27.35, w: 'prop2' }, { t: 28.25, w: 'prop3' },
+    { t: 29.75, w: 'cal' }, { t: 30.85, w: 'stamp' }, { t: 31.95, w: 'flag' }, { t: 33.15, w: 'cell1' },
+    { t: 33.55, w: 'cell4' }, { t: 34.62, w: 'cell2' }, { t: 35.25, w: 'cell5' }, { t: 36.05, w: 'cell3' },
+    { t: 37.45, w: 'reset' }, { t: 38.95, w: 'board' },
+    { t: 40.45, w: 'salute' }, { t: 43.58, w: 'wipe' }
+  ];
+  for (const e of EV) {
+    e.t = MUS_OFF + Math.round((e.t - MUS_OFF) / MUS_BEAT) * MUS_BEAT; e.f = Math.round(e.t * 24);
+    e.calm = !(e.w === 'arrive' || e.w === 'wipe');       // 转场事件不参与屏息（否则擦除会被推迟）
+  }
+  const CALM_EV = () => EV.filter(e => e.calm);
+
+  function evPre(t) {                                   // 预备：事件前 6 帧（1 帧内进入屏息）
+    let k = 0;
+    for (const e of EV) if (e.calm && t > e.t - EVPRE && t < e.t) k = 1;   // 第 1 帧进入屏息；爆发帧本身不屏息
+    return k;
+  }
+  function evPost(t) {                                  // 余韵：事件后 9 帧
+    let k = 0;
+    for (const e of EV) if (e.calm && t >= e.t && t < e.t + EVPOST) k = Math.max(k, 1 - seg(t, e.t, e.t + EVPOST));
+    return k;
+  }
+  const calmK = t => Math.max(evPre(t), 0.5 * evPost(t));
+  const holdDamp = t => 1 - 0.75 * evPre(t);            // 预备期拍点闪烁压到 25%（相位不变，仍可逐帧核对）
+  function calmHeld(t) {                                // 被屏息"扣掉"的时间（boil/摄像/粒子用）
+    let h = 0;
+    for (const e of EV) {
+      if (!e.calm) continue;
+      const a = e.t - EVPRE, b = e.t;
+      if (t >= b) h += b - a; else if (t > a) h += t - a;
+    }
+    return h;
+  }
+  const warpT = t => t - calmHeld(t);
+  function joltAt(t) {                                  // 爆发帧镜头冲击（2 帧衰减）
+    for (const e of EV) {
+      const d = t - e.t;
+      if (d >= 0 && d < 2 / 24) {
+        const k = 1 - d * 12;
+        return { zoom: 1 + 0.016 * k, dx: 8 * k * Math.sin(e.f * 1.7), dy: 6 * k * Math.cos(e.f * 2.3) };
+      }
+    }
+    return null;
+  }
+  setBoilClock(warpT);
+  setWarp(warpT);                                     // 幕内动画也走演出时钟（屏息期整体减速）
+  setJolt(() => joltAt(T));
+  // 预备期压暗：3 帧渐入（1.4%/帧）、爆发后 2 帧释放（2.1%/帧）—— 都在"单帧亮度跳变 ≤3%"红线内
+  function shadeAt(t) {
+    let k = 0;
+    for (const e of EV) {
+      if (e.calm && t > e.t - EVPRE - 3 / 24 && t <= e.t + 2 / 24) {
+        const inK = seg(t, e.t - EVPRE - 3 / 24, e.t - EVPRE - 0.2 / 24);
+        const outK = 1 - seg(t, e.t, e.t + 2 / 24);
+        k = Math.max(k, inK * outK);
+      }
+    }
+    return 0.042 * k;
+  }
+  setShade(shadeAt);
+  const evOf = w => EV.find(e => e.w === w);
+
+  // ── 姿态档位：每个强事件一套不同剪影（举手/指向/蹲身/侧身/摊手），每幕因此有 ≥5 套姿态 ──
+  const POSE_DEF = [
+    { aL: 1.58, aR: 1.58, sq: 0.11, eyes: 'happy', mouth: 'open', emote: 'spark' },
+    { aL: 0.22, aR: 1.78, sq: -0.06, eyes: 'wide', mouth: 'O' },
+    { aL: 1.34, aR: 1.34, sq: 0.18, eyes: 'squeeze', mouth: 'grin' },
+    { aL: 1.80, aR: 0.30, sq: -0.08, eyes: 'wink', mouth: 'smile' },
+    { aL: 0.92, aR: 0.92, sq: 0.08, eyes: 'shine', mouth: 'cat', emote: 'spark' }
+  ];
+  function poseAt(t) {
+    let best = null, bk = 0;
+    for (let i = 0; i < EV.length; i++) {
+      const d = t - EV[i].t;
+      if (d < -0.05 || d > 0.55) continue;
+      const k = d < 0 ? 0.65 : Math.max(0, 1 - d / 0.55);
+      if (k > bk) { bk = k; best = POSE_DEF[i % POSE_DEF.length]; }
+    }
+    return bk > 0.22 ? best : {};
+  }
+  setPoseHook(poseAt);
+
+  // 爆发冲击层：墨环 + 放射笔触 + 高光（每个强事件共用，2-3 帧）
+  function hitFX(t, x, y, R, col) {
+    for (const e of EV) {
+      const d = t - e.t;
+      if (d < 0 || d > 3 / 24) continue;
+      if (t - e.t > 3 / 24) break;
+      const k = clamp(1 - d * 8), rk = easeOut(1 - k);
+      boilSeed('hit_' + e.w + e.f);
+      const rr = R * (0.30 + 1.45 * rk);
+      push(); translate(x, y);
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU + hash(i + e.f) * 0.1;
+        const w = R * 0.11 * (1 - rk * 0.55) * (0.55 + hash(i * 3 + e.f) * 0.9);
+        paint(rectPts(Math.cos(a) * rr - w / 2, Math.sin(a) * rr * 0.72 - w / 2, w, w * 0.85, 5, 1.5),
+          { wash: i % 2 ? col : PAL.ink, washOp: 240 * k, ink: null });
+      }
+      pop();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + 0.28, l0 = rr * 0.55, l1 = l0 + R * 0.55 * (1 - k * 0.4);
+        paint([[x + Math.cos(a) * l0, y + Math.sin(a) * l0 * 0.8], [x + Math.cos(a) * l1, y + Math.sin(a) * l1 * 0.8]],
+          { wash: i % 2 ? PAL.ink : col, washOp: 200 * k, ink: null });
+      }
+      // 冲击扫带：1.5 帧内横扫全幅的残影带 —— 结构变化量的主要来源（≥18% 像素显著变化）
+      for (let s = 0; s < 3; s++) {
+        const q = easeOut(clamp(rk * 1.15 - s * 0.12));
+        const bw = W * 0.52, bh = H * 0.085;                 // 细长残影条（像速度线，不是色块）
+        const sx = lerp(-bw * 1.1, W + bw * 0.1, q), sy = y - bh / 2 + (hash(e.f + s) - 0.5) * 190;
+        paint(rectPts(sx, sy + Math.sin(q * 2.2 + s) * 46, bw, bh, 16, 2.0),
+          { wash: s % 2 ? col : '#FFFDF6', washOp: (96 - s * 26) * k, ink: null });
+      }
+      glow(x, y, R * (0.7 + 1.1 * rk), col, 0.5 * k);
+      return;                                   // 每个事件每帧只画一次（本帧后续 hitFX 调用直接返回，避免 GPU 峰值）
+    }
+  }
+
+  // 爆发帧"到位"系数：事件帧前 2 帧 0 → 事件帧 1（大幅道具的 2 帧到位动效）
+  function popK(t, w) {
+    const e = evOf(w);
+    return e ? easeOutCubic(seg(t, e.t - 1.5 / 24, e.t)) : 0;
+  }
+  function settleK(t, w) {                              // 事件后回稳（0→1）
+    const e = evOf(w);
+    return e ? seg(t, e.t, e.t + 4 / 24) : 0;
+  }
+
+  // ── 大幅道具：2 帧内从远处到位并过冲，落地挤压 ──
+  function slamBlock(t, w, x, y, bw, bh, col, txt, size, rot0) {
+    const e = evOf(w); if (!e) return;
+    const a = t - e.t;
+    if (a < -1.5 / 24 || a > 0.42) return;                 // 定格 ~10 帧（0.42s），不再长留遮住角色
+    const k = easeOutCubic(seg(t, e.t - 1 / 24, e.t));   // 恰好 1 帧内到位：帧 f-1 = 起点、帧 f = 终点（单帧最大跳变）
+    const sq = Math.max(0, 1 - a * 7);
+    const dx = (1 - k) * bw * 0.85, dy = (1 - k) * 420;
+    boilSeed('slam_' + w + e.f);
+    push();
+    translate(x + dx, y + dy);
+    rotate(lerp(rot0, 0, k));
+    scale(1 + 0.16 * sq, 1 - 0.14 * sq);
+    paint(rrPts(-bw / 2, -bh / 2, bw, bh, Math.min(26, bh * 0.2), 2), {
+      wash: col, washOp: 255, fill: PAL.ink, fillOp: 34, bleed: 0.06, tex: 0.35, ink: PAL.ink, sw: 2.2
+    });
+    pop();
+    if (txt) letter(txt, x + dx, y + dy, size, PAL.ink, { rot: lerp(rot0, 0, k), alpha: k });
+  }
+
+  // ══ 第八轮 · 像素恐龙表演状态机（每幕 ≥3 套状态 + 每幕一次 walk 走位 ≥120px）══
+  //   clip 取 assets/dino2 的 7 组：walk/idle/actions/memes/memes2/memes3/standup
+  //   帧号按素材顺序（0 基）：memes 0爆哭 1气鼓鼓 2大笑 3愣住 4无语 5吃瓜 6摆烂 7震惊 8比心
+  //   actions 0跳起 1挥手 2坐下 3躲睡 4举方块 5冲刺 6欢呼 7比心 ｜ memes2 0敬礼 … ｜ memes3 5点赞 6暗中观察 7石化 8谢谢你
+  const DACT = {
+    1: { walk: [4.12, 5.00], wx: [300, 640], ev: { pile: ['memes', 0], pile2: ['memes', 4], sweep: ['actions', 5], clean: ['idle', 6], spark: ['actions', 0], mark: ['memes', 2] } },
+    2: { walk: [7.20, 8.20], wx: [1250, 980], ev: { power: ['actions', 4], card1: ['memes', 2], card2: ['memes', 8], card3: ['memes3', 5], surge: ['actions', 6] } },
+    3: { walk: [15.30, 16.50], wx: [345, 720], ev: { lay1: ['memes3', 2], lay2: ['memes3', 1], lay3: ['actions', 4], build: ['memes3', 5], show: ['memes2', 0] } },
+    4: { walk: [24.45, 25.20], wx: [1560, 1200], ev: { hatch: ['memes', 7], prop1: ['memes', 8], prop2: ['actions', 6], prop3: ['memes2', 0] } },
+    5: { walk: [36.15, 36.90], wx: [1160, 1440], ev: { cal: ['memes3', 6], stamp: ['memes3', 5], flag: ['memes2', 0], cell1: ['memes3', 7], cell4: ['memes3', 8], cell2: ['memes3', 5], cell5: ['memes3', 0], cell3: ['memes3', 6], reset: ['memes', 7], board: ['actions', 7], salute: ['memes3', 5] } }
+  };
+  function dinoActAt(t) {
+    const act = t < SHOT_T0.s2 ? 1 : t < SHOT_T0.s3 ? 2 : t < SHOT_T0.s4 ? 3 : t < SHOT_T0.s5 ? 4 : 5;
+    const A = DACT[act];
+    for (const e of EV) {                                  // 事件定点：爆发后 4-10 帧定格
+      const pose = A.ev[e.w]; if (!pose) continue;
+      const d = t - e.t, hold = (e.w === 'sweep' || e.w === 'surge' || e.w === 'show') ? 10 : 6;
+      if (d >= 0 && d < hold / 24) return { clip: pose[0], f: pose[1], dx: 0, scale: 1 };
+    }
+    if (t >= A.walk[0] && t < A.walk[1]) {                 // 走位：12fps 循环 + 位移（每幕 ≥160px）
+      const k = (t - A.walk[0]) / (A.walk[1] - A.walk[0]);
+      return { clip: 'walk', f: Math.floor((t - A.walk[0]) * 12), dx: lerp(A.wx[0], A.wx[1], k) - A.wx[0], scale: 1 };
+    }
+    return { clip: 'idle', f: Math.floor(warpT(t) * 4 + act * 3), dx: 0, scale: 1 };   // 常态 4fps 慢循环
+  }
+  setDinoAct(dinoActAt);
+
+  // ══ 各幕新叙事阶段（每幕 3 段以上，新构图状态）══
+  function stageLayer(act, t) {
+    if (act === 1) {
+      // ① 99+ 红标在桌面堆积（1.30s / 2.20s 两批，共 9 枚）─ ② 3.92s 桌面清空 ─ ③ 5.96s ANS 字标落地
+      const nb = Math.floor(clamp((t - 1.15) / 0.30, 0, 9));
+      for (let i = 0; i < nb; i++) {
+        const bx = 1330 + (i % 3) * 58, by = 690 - Math.floor(i / 3) * 52;
+        const age = t - (1.15 + i * 0.30);
+        if (age < 0) continue;
+        const k = easeOutCubic(seg(age, 0, 0.11));
+        const sq = Math.max(0, 1 - (age - 0.11) * 8);
+        boilSeed('badge' + i);
+        push(); translate(bx, by - (1 - k) * 190); scale(1 + 0.2 * sq, 1 - 0.18 * sq);
+        paint(rrPts(-36, -26, 72, 52, 10, 1.4), {
+          wash: '#E0483C', washOp: 255, fill: '#B3261E', fillOp: 80, ink: PAL.ink, sw: 1.3
+        });
+        pop();
+        letter('99+', bx, by - (1 - k) * 190, 25, '#FFF4DC', { alpha: k });
+      }
+      if (t > 1.3) letter('99+ 吃灰收藏夹', 1478, 742, 22, PAL.ochre, { alpha: seg(t, 1.3, 1.4) * (1 - seg(t, 4.6, 4.75)) });
+      // ③ 灵感汇聚 → ANS 字标（5.15s 汇聚线 / 5.96s 落地）
+      const cv = evOf('spark'), mk = evOf('mark');
+      if (t > cv.t - 0.5 && t < mk.t + 0.5) {
+        const k = clamp((t - (cv.t - 0.5)) / (mk.t - cv.t + 0.5));
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * TAU + 0.4, r = lerp(760, 60, easeOut(k));
+          const px = 960 + Math.cos(a) * r, py = 560 + Math.sin(a) * r * 0.62;
+          if (t < mk.t) sparkle(px, py, 13, 0.25 + 0.35 * hash(i + 3), DINO_COLS.mint);
+        }
+      }
+      slamBlock(t, 'mark', 960, 560, 620, 260, DINO_COLS.mintLt, 'ANS', 150, -0.05);
+      if (t < cv.t - 0.6) hitFX(t, 1470, 660, 300, '#E0483C');
+      if (t < mk.t + 0.4) hitFX(t, 960, 560, 340, DINO_COLS.mint);
+      // 每个事件一记锐利重击（卡片墙倾泻 / 一扫而空 / 灵感汇聚）
+      slamBlock(t, 'pile', 1470, 560, 900, 320, '#E0483C', '99+ 吃灰收藏夹', 60, 0.08);
+      slamBlock(t, 'pile2', 1470, 400, 1000, 240, '#C23A31', '收藏夹 ×99+ · 全都没看', 46, -0.06);
+      slamBlock(t, 'sweep', 960, 470, 1500, 260, DINO_COLS.mintLt, '一扫而空', 88, 0.05);
+      slamBlock(t, 'clean', 960, 620, 1300, 200, '#FFF4DC', '桌面清空 · 一个不留', 56, -0.04);
+      slamBlock(t, 'spark', 960, 350, 1100, 220, PAL.ochre, '灵感汇聚', 72, 0.06);
+    } else if (act === 2) {
+      // 三张旗舰卡逐张点亮：卡体 2 帧过冲 + 星章盖章 + ONLINE 横幅
+      const cs = ['card1', 'card2', 'card3'], xs = [420, 960, 1500];
+      for (let i = 0; i < 3; i++) {
+        const e = evOf(cs[i]);
+        const a = t - e.t;
+        if (a < -1.5 / 24 || a > 2.2) continue;
+        const k = easeOutCubic(seg(t, e.t - 1.5 / 24, e.t));
+        const sq = Math.max(0, 1 - a * 6);
+        boilSeed('cardlit' + i);
+        push(); translate(xs[i], 300); scale(0.72 + 0.30 * k + 0.1 * sq, 0.72 + 0.30 * k - 0.09 * sq);
+        paint(rrPts(-190, -230, 380, 460, 24, 2.2), {
+          wash: ['#7FD8FF', '#FFD07F', '#C7A8FF'][i], washOp: 90 * k, ink: null
+        });
+        pop();
+        const seal = easeOutCubic(seg(t, e.t, e.t + 2 / 24));
+        if (seal > 0) {
+          push(); translate(xs[i], 300); rotate(lerp(-0.5, 0, seal)); scale(2.2 - 1.2 * seal);
+          paint(starPts(0, 0, 150, 0.5, 5, 0.2), { wash: ['#2F8FD6', '#D68A2F', '#8A5FD6'][i], washOp: 230 * (1 - seg(t, e.t + 0.4, e.t + 0.9)), ink: PAL.ink, sw: 2 });
+          pop();
+        }
+        slamBlock(t, 'banner' + i, xs[i], 470, 420, 110, '#FFF4DC', ['GPT-6-Astra 上线', '大肥鱼 v4.1 上线', 'Opus 5.5 上线'][i], 34, 0.06);
+      }
+      // 总闸 / 全员满血
+      slamBlock(t, 'power', 960, 640, 520, 130, '#FFE082', 'MAX 满血总闸 · 三舱直连', 34, -0.04);
+      slamBlock(t, 'surge', 960, 520, 900, 200, DINO_COLS.mintLt, '全部满血开跑', 74, 0.03);
+      for (let i = 0; i < 3; i++) hitFX(t, xs[i], 300, 300, ['#7FD8FF', '#FFD07F', '#C7A8FF'][i]);
+      hitFX(t, 960, 560, 420, DINO_COLS.mint);
+    } else if (act === 3) {
+      // 教程高塔逐层拆解（3 层）→ 21.10s 成品成型 → 22.45s 展示（镜头推近）
+      const ls = ['lay1', 'lay2', 'lay3'], ys = [620, 520, 420];
+      const built = evOf('build');
+      for (let i = 0; i < 3; i++) {
+        const e = evOf(ls[i]);
+        const a = t - e.t;
+        const gone = t > e.t;
+        const fly = gone ? clamp(a * 5) : 0;
+        if (t < e.t - 1.5 / 24) {                        // 未拆：层块在原位（叠塔）
+          if (t > built.t + 3) continue;
+          boilSeed('lay' + i);
+          push(); translate(700 + (t > e.t ? 0 : 0), ys[i]);
+          rotate(0.02 * i + (t < e.t ? Math.sin(warpT(t) * 1.4 + i) * 0.012 : 0));
+          paint(rrPts(-250, -80, 500, 160, 16, 1.8), {
+            wash: ['#B9A48E', '#A8B08E', '#8EA8B9'][i], washOp: 255, fill: PAL.ink, fillOp: 26,
+            tex: 0.5, ink: PAL.ink, sw: 2
+          });
+          pop();
+          letter(['① 翻教程', '② 配环境', '③ 调依赖'][i], 700, ys[i], 34, PAL.ink);
+        } else {
+          const x = 700 + fly * 900, y = ys[i] - fly * 180, rot = fly * 1.5;
+          boilSeed('layfly' + i);
+          push(); translate(x, y); rotate(rot); scale(1 - fly * 0.35);
+          paint(rrPts(-250, -80, 500, 160, 16, 1.8), {
+            wash: ['#B9A48E', '#A8B08E', '#8EA8B9'][i], washOp: 255 * (1 - fly * 0.7), ink: PAL.ink, sw: 2
+          });
+          pop();
+        }
+      }
+      slamBlock(t, 'build', 700, 520, 560, 250, DINO_COLS.mintLt, '一键跑通 · 成品生成', 44, -0.05);
+      slamBlock(t, 'show', 1020, 470, 1560, 300, '#FFF4DC', '成品验收 · 可直接用', 92, 0.04);
+      slamBlock(t, 'show', 1020, 700, 1400, 130, DINO_COLS.mintLt, '第二件 · 最快跑出成品', 44, -0.03);
+      for (let i = 0; i < 3; i++) hitFX(t, 700, ys[i], 300, '#B9A48E');
+      hitFX(t, 1180, 500, 420, DINO_COLS.mint);
+    } else if (act === 4) {
+      // 礼物舱开盖 → 三件福利道具依次抛出并被接住（各自轨迹 + 落地挤压）
+      const hs = ['hatch', 'prop1', 'prop2', 'prop3'];
+      const he = evOf('hatch');
+      const lid = easeOutCubic(seg(t, he.t - 1.5 / 24, he.t));
+      if (t > he.t - 2 / 24) {
+        boilSeed('lid');
+        push(); translate(960 - lid * 380, 300 - lid * 210); rotate(-lid * 1.1);
+        paint(rrPts(-450, -110, 900, 220, 26, 2.2), { wash: '#8FDCC0', fill: PAL.ink, fillOp: 40, ink: PAL.ink, sw: 2.4 });
+        pop();
+      }
+      const props = [['#FFD95A', '算力券'], ['#9BE0C5', '教程卡'], ['#FFB3C7', '额度礼包']];
+      for (let i = 0; i < 3; i++) {
+        const e = evOf(hs[i + 1]), a = t - e.t;
+        if (a < -1.5 / 24 || a > 1.4) continue;
+        const k = easeOutCubic(seg(t, e.t - 1.5 / 24, e.t));
+        const tx = lerp(960, 400 + i * 560, k), ty = lerp(430, 760 - (i % 2) * 40, k) - Math.sin(clamp(k) * Math.PI) * 150;
+        const sq = Math.max(0, 1 - Math.max(0, a) * 6);
+        boilSeed('prop' + i);
+        push(); translate(tx, ty); rotate((1 - k) * 0.9);
+        scale((1 + 0.22 * sq) * (0.55 + 0.45 * k), (1 - 0.2 * sq) * (0.55 + 0.45 * k));
+        paint(rrPts(-170, -128, 340, 256, 26, 2.0), { wash: props[i][0], fill: PAL.ink, fillOp: 30, ink: PAL.ink, sw: 2.4 });
+        pop();
+        letter(props[i][1], tx, ty, 44, PAL.ink, { alpha: k });
+        hitFX(t, tx, ty, 260, props[i][0]);
+      }
+      slamBlock(t, 'arrive', 960, 620, 660, 150, DINO_COLS.mintLt, '第三件 · 注册即送算力福利', 46, -0.03);
+      for (let i = 0; i < 3; i++) slamBlock(t, 'prop' + (i + 1), 960, 196 + i * 76, 1000, 132, props[i][0], props[i][1] + ' · 已到账', 44, i % 2 ? 0.04 : -0.04);
+      hitFX(t, 960, 350, 380, DINO_COLS.mint);
+    } else if (act === 5) {
+      // 日历逐格盖章（3 次）→ 已有的插旗 / Full Reset / 宣誓
+      const cs = ['cell1', 'cell4', 'cell2', 'cell5', 'cell3'];
+      const cells = [[0, 0], [2, 1], [1, 0], [1, 1], [2, 0]];
+      for (let i = 0; i < cs.length; i++) {
+        const e = evOf(cs[i]), a = t - e.t;
+        if (a < -1.5 / 24) continue;
+        const cx = 232 + cells[i][0] * 96, cy = 250 + cells[i][1] * 74;
+        if (a < 0) {                                     // 印章下落
+          const k = easeOutCubic(seg(t, e.t - 1.5 / 24, e.t));
+          boilSeed('stampdrop' + i);
+          push(); translate(cx, cy - (1 - k) * 420); rotate((1 - k) * 0.4);
+          paint(rrPts(-70, -70, 140, 140, 14, 1.6), { wash: PAL.sap, ink: PAL.ink, sw: 2 });
+          pop();
+        } else {
+          const sq = Math.max(0, 1 - a * 7);
+          boilSeed('stampmark' + i);
+          push(); translate(cx, cy); scale(1 + 0.25 * sq, 1 - 0.22 * sq);
+          paint(starPts(0, 0, 52 + 10 * sq, 0.42, 5, 0.2), { wash: PAL.sap, ink: PAL.ink, sw: 1.6 });
+          pop();
+        }
+        hitFX(t, cx, cy, 200, PAL.sap);
+      }
+      slamBlock(t, 'reset', 960, 300, 1100, 230, '#E0483C', 'FULL RESET · 全员额度重置', 58, 0.05);
+      slamBlock(t, 'board', 960, 440, 760, 200, '#FFF4DC', '绝不鸽 · 每天二选一', 62, -0.04);
+      slamBlock(t, 'salute', 960, 620, 720, 180, DINO_COLS.mintLt, 'Day 01 / 28 · 改进开始', 56, 0.03);
+      hitFX(t, 960, 400, 420, DINO_COLS.mint);
+    }
   }
 
   // The shot list is derived from SHOT_T0: re-time the film by editing that one table (+ FILM_DUR in

@@ -2,8 +2,15 @@
 // Length and rhythm come from PROJECT in config.js.
 const W = 1920, H = 1080;
 // BOIL 8 = 每张手绘线保持 3 帧（≈8fps）。原来是 12（保持 2 帧），在 1080p 1:1 下被读成"全片乱闪"。
-const BPM = PROJECT.bpm, BEAT = 60 / BPM, OFF = PROJECT.offset || 0, BOIL = 8, DUR = PROJECT.duration;
-const JITK = 0.5;   // 手绘抖动幅度系数（抗闪：取原始抖动的一半）
+const BPM = PROJECT.bpm, BEAT = 60 / BPM, OFF = PROJECT.offset || 0, BOIL = 6, DUR = PROJECT.duration;   // 第十轮补丁：8fps→6fps（保持 4 帧），错峰后仍超标时的授权动作
+const JITK = 0.35;  // 手绘抖动幅度系数（第十轮：再降 30%，1.0→0.5→0.35；boil 仍为 8fps）
+// 场景可注入的 boil 时钟：屏息窗口内把时钟拖住 → 线稿完全静止（"预备"期画面近乎屏息）
+let CLOCK = t => t;
+const setBoilClock = fn => { CLOCK = fn; };
+// 场景可注入的"演出时钟"：屏息窗口内把幕内动画整体减速（角色/粒子/次级动效一起慢下来），
+// 但分镜与字幕仍走真实 t（stageLayer 与 SUBS 用 t），所以口播边界与转场不受影响。
+let WARP = t => t;
+const setWarp = fn => { WARP = fn; };
 const TAU = Math.PI * 2;
 const PAL = {
   paper: '#F3EBDC', ink: '#2B2233', clay: '#D97757', clayDk: '#A84D33', clayLt: '#F2A283',
@@ -25,7 +32,21 @@ const jit = a => (random() * 2 - 1) * a * JITK;
 // that re-boil every frame (jitter). boilSeed(key) restarts the stream from the boil frame and a key (any string or
 // number) that's the same every frame: call it before each separate element. clawd() does this for itself and its parts.
 let BOILN = 0, CLAWD_N = 0;
-const boilSeed = key => { let h = 2166136261; for (const c of key + '|' + BOILN) h = Math.imul(h ^ c.charCodeAt(0), 16777619); randomSeed(h >>> 0); };
+// 第十轮补丁 · boil 按层错峰：同一层内部仍 8fps 且纹理不变，但三层不在同一帧重抖 ——
+// 否则每 3 帧里有 1 帧的帧差明显大于另外 2 帧，形成 3 帧周期的顿感（局部 jerk 0.8-1.05 的主因）。
+// 层由 key 前缀判定（场景侧的命名本来就是系统化的），无需改任何绘制调用点。
+const boilLayerOf = key => {
+  const k = String(key);
+  if (/^(shot|end|open|bg|floor|rug|cloud|mask|sky|hill)/.test(k)) return 2;   // 背景 / 装饰
+  if (/^(dino|creator|halo|str_|clawd)/.test(k)) return 0;                     // 角色 / 近景
+  return 1;                                                                    // 道具 / 中景
+};
+const boilSeed = key => {
+  let h = 2166136261;
+  const n = BOILN + boilLayerOf(key);
+  for (const c of key + '|' + n) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  randomSeed(h >>> 0);
+};
 
 // ---------- timing helpers (everything is a pure function of t; no state survives between frames) ----------
 const seg = (t, a, b) => clamp((t - a) / (b - a));                 // 0..1 progress of t through [a, b]
@@ -100,7 +121,20 @@ function stroll(t, t0, t1, x0, x1, u) {
 // active are placed through it automatically (pass {screen:true} to opt out). One level only: always pair with camEnd().
 // LAST_CAM stays set after camEnd(), until the next frame: renderSheet's crops that follow a world point use it.
 let CAM = null, LAST_CAM = null;
-function camBegin(cx = W / 2, cy = H / 2, zoom = 1, rot = 0) { push(); translate(W / 2, H / 2); rotate(rot); scale(zoom); translate(-cx, -cy); CAM = LAST_CAM = { cx, cy, zoom, rot }; }
+// 场景可注入的"爆发冲击"：爆发帧给整层世界 1-2 帧的位移/缩放冲击（HUD 在 camEnd 之后画，不受影响）
+let JOLT = () => null;
+const setJolt = fn => { JOLT = fn; };
+let SHADE = () => 0;                        // 场景注入：预备期压暗系数 0..0.05
+const setShade = fn => { SHADE = fn; };
+function camBegin(cx = W / 2, cy = H / 2, zoom = 1, rot = 0) {
+  const j = JOLT() || {};
+  push();
+  translate(W / 2 + (j.dx || 0), H / 2 + (j.dy || 0));
+  rotate(rot + (j.rot || 0));
+  scale(zoom * (j.zoom || 1));
+  translate(-cx, -cy);
+  CAM = LAST_CAM = { cx, cy, zoom, rot };
+}
 function camEnd() { pop(); CAM = null; }
 function toScreen(x, y, cam = CAM) {
   if (!cam) return [x, y];
@@ -225,10 +259,22 @@ function sfx(txt, x, y, size, color, age, o = {}) {
   const life = o.life ?? 1.2; if (age < 0 || age > life) return;
   letter(txt, x, y, size, color, { pop: age * 5, rot: (o.rot ?? -.08) + Math.sin(age * 20) * .03 * (1 - age / life), alpha: 1 - seg(age, life - .25, life), ...o });
 }
+// 像素精灵：走 letter 队列（2D 合成层），避免 p5.brush 的 framebuffer 与 WEBGL 贴图冲突。
+// 世界坐标 → toScreen 映射（跟随摄像）；最近邻绘制（imageSmoothingEnabled=false），绝不插值。
+function sprite(img, x, y, w, h, o = {}) {
+  if (!img || !img.width) return;
+  if (CAM && !o.screen) { [x, y] = toScreen(x, y); w *= CAM.zoom; h *= CAM.zoom; }
+  LETTERS.push({ img, x, y, w, h, rot: o.rot || 0, alpha: o.alpha ?? 1 });
+}
 function drawLetters(c) {
   for (const L of LETTERS) {
     const k = L.pop != null ? backOut(L.pop) : 1; if (k <= .01) continue;
     c.save(); c.translate(L.x, L.y); c.rotate(L.rot || 0); c.scale(k, k); c.globalAlpha = L.alpha ?? 1;
+    if (L.img) {                                   // 像素精灵：最近邻 + 底部中心锚点
+      c.imageSmoothingEnabled = false;
+      c.drawImage(L.img.canvas || L.img, -L.w * 0.5, -L.h, L.w, L.h);
+      c.restore(); continue;
+    }
     c.font = L.font || `bold ${L.size}px "Permanent Marker", "ZCOOL KuaiLe", "PingFang SC", cursive, sans-serif`;
     c.textAlign = L.align || 'center'; c.textBaseline = 'middle';
     if (L.stroke) { c.lineJoin = 'round'; c.lineWidth = L.size * .14; c.strokeStyle = L.stroke; c.strokeText(L.txt, 0, 0); }
@@ -289,6 +335,7 @@ async function setup() {
   brush.scaleBrushes(5); defineBrushes();
   paperG = makePaper(); grainC = makeGrain(); glowTex = makeGlowTex(); letG = createGraphics(W, H); letG.pixelDensity(1);
   outC = document.getElementById('out'); outX = outC.getContext('2d');
+  await preloadDino2();                              // 第八轮：像素恐龙精灵预加载完成前不出帧
   await Promise.allSettled([document.fonts.load('100px "Permanent Marker"'), document.fonts.load('100px "ZCOOL KuaiLe"')]);
   window.ready = true;
   if (!location.search.includes('render')) devUI();
@@ -297,7 +344,7 @@ function draw() {
   if (!window.ready) return;
   LETTERS = []; CAM = LAST_CAM = null;
   push(); translate(-W / 2, -H / 2);
-  BOILN = Math.floor(T * BOIL); CLAWD_N = 0; boilSeed('frame'); noiseSeed(77);
+  BOILN = Math.floor(CLOCK(T) * BOIL); CLAWD_N = 0; boilSeed('frame'); noiseSeed(77);
   image(paperG, 0, 0);
   drawWorld(T);
   pop();
@@ -308,6 +355,9 @@ function composite(t) {
   c.scale(sx, sy);
   c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
   c.drawImage(drawingContext.canvas, 0, 0, W, H);
+  // 预备期压暗（场景注入 3-5%）：只压世界层，字幕/HUD 在 letter 层最后画，保持清晰可读
+  const sh = SHADE(t);
+  if (sh > 0.002) { c.fillStyle = 'rgba(30,24,42,' + sh.toFixed(4) + ')'; c.fillRect(0, 0, W, H); }
   drawLetters(c);
   c.globalCompositeOperation = 'multiply'; c.drawImage(grainC, 0, 0);
   c.globalCompositeOperation = 'source-over';

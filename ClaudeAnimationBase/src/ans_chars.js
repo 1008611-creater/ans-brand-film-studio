@@ -156,8 +156,49 @@ function creatorFacePts(u, vName, J) {
   return raw.map(([px, py]) => [px * u + jit(J * 0.22), py * u + jit(J * 0.22)]);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// 第八轮 · 像素 IP 版小恐龙（assets/dino2 · 55 张 RGBA 精灵）
+//   红线：整数倍缩放（1×-3×）+ 最近邻（noSmooth）、不做非等比拉伸（挤压只用整体缩放 + 位移）、
+//   不加运动模糊。形象比例锁由素材本身保证（不重绘、不改比例、不重新描边）。
+//   场景侧通过 setDinoAct(fn) 注入 {clip, f, dx, scale}；素材未加载时自动退回下面的程序化造型。
+// ══════════════════════════════════════════════════════════════════════════════
+const DINO2 = { walk: [], idle: [], actions: [], memes: [], memes2: [], memes3: [], standup: [] };
+const DINO2_N = { walk: 8, idle: 8, actions: 8, memes: 9, memes2: 9, memes3: 9, standup: 4 };
+let DINO2_OK = false, DINO_ACT_FN = null;
+const setDinoAct = fn => { DINO_ACT_FN = fn; };
+function preloadDino2() {
+  const jobs = [];
+  for (const c in DINO2_N) {
+    DINO2[c] = new Array(DINO2_N[c]);
+    for (let i = 1; i <= DINO2_N[c]; i++) {
+      const idx = i - 1, name = 'assets/dino2/' + c + '/' + (i < 10 ? '0' + i : '' + i) + '.png';
+      jobs.push(new Promise(res => loadImage(name, im => { DINO2[c][idx] = im; res(1); }, () => res(0))));
+    }
+  }
+  return Promise.all(jobs).then(r => { DINO2_OK = r.every(Boolean); return DINO2_OK; });
+}
+// 底部中心锚点 + 整数位置 + 整数倍缩放 + 最近邻；湿边由场景侧 wetHalo 负责
+function dinoSprite(x, y, st, u) {
+  const c = st.clip || 'idle', arr = DINO2[c] || DINO2.idle;
+  if (!arr || !arr.length) return false;
+  const img = arr[Math.abs(Math.round(st.f || 0)) % arr.length];
+  if (!img || !img.width) return false;
+  const k = Math.max(1, Math.min(3, Math.round(st.scale || 1)));
+  const w = img.width * k, h = img.height * k;
+  const q4 = v => Math.round(v * 4) / 4;                     // 0.25px 网格：相机运动时亚像素平滑，像素仍锐利
+  const X = q4(x + (st.dx || 0)), Y = q4(y + (st.dy || 0));
+  // 柔和投影（同类色 0.15）：画在世界层，精灵在其上 → 像素坐在湿色里
+  paint(ellPts(X + 4, Y + 5, w * 0.30, 16, 14), { wash: DINO_COLS.mintDk, washOp: 38, ink: null });
+  sprite(img, X, Y, w, h);                          // 底部中心锚点，最近邻，整数倍
+  return true;
+}
+
 // ---------- 1. WIDE, CHUBBY, SHORT-LEGGED STANDING ANS LITTLE DINO (宽胖圆润 + 短粗有弧度小胖腿) ----------
 function dino(x, y, u, o = {}) {
+  if (DINO2_OK && DINO_ACT_FN) {                    // 像素精灵优先
+    const st = DINO_ACT_FN(T);
+    if (st && dinoSprite(x, y, st, u)) return;      // 未加载/取帧失败则继续走程序化造型
+  }
   const id = o.boilKey ?? ('dino_' + (++CLAWD_N));
   const rs = part => boilSeed(`${id}_${part}`);
   x += (o.dx || 0) * u;

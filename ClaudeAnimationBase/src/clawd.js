@@ -573,6 +573,9 @@ const EMO = {
   hopeful:    { eyes: 'shine', mouth: 'cat', blush: .35, take: .5, body: t => { const b = _b(t); return { sq: -.06 - .02 * b.ab, dy: -.25 * b.ab, lookY: -.4, aL: .5 + .05 * b.s1, aR: .5 - .05 * b.s1, rot: .03 * Math.sin(b.bp * Math.PI / 2) }; } },
 };
 
+let POSE_HOOK = null;
+const setPoseHook = fn => { POSE_HOOK = fn; };
+
 // One emotion, alive at time t: face, colour and body motion together. Spread it into clawd():
 //   clawd(x, y, u, feel('happy', t))       clawd(x, y, u, { ...feel('sad', t), view: 'q', hat: 'beanie' })
 function feel(name, t, over = {}) {
@@ -612,6 +615,8 @@ function emotions(t, keys, o = {}) {
   const same = prev && prev.emote === cur.emote;
   cur.emoteK = same ? 1 : seg(age, .06, .32) * (E.fade && !(over && over.emote) ? 1 - seg(age, 1.4, 1.8) : 1);
   cur.emoteAge = age;
+  // 第六轮：场景注入的"姿态档位" —— 每个强结构事件切一套不同剪影（未命中时返回 {}，不改既有表演）
+  if (POSE_HOOK) Object.assign(cur, POSE_HOOK(t) || {});
   return cur;
 }
 

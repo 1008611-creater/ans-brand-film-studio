@@ -39,14 +39,27 @@ const read = (p) => fs.readFileSync(p, "utf8");
 const sha = (p) => crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
 const exists = (p) => fs.existsSync(p);
 
-// ── A. V4.6 造型冻结 ────────────────────────────────────────────────
+// ── A. 形象权威：小恐龙 = 像素 IP 版素材（2026-10-21 取代「V4.6 程序化造型冻结」）──
+// 该决定取代旧条目「V4.6 造型字节冻结」：用户直接指令「改成这个形象吧」，
+// 小恐龙改用 assets/dino2 的 55 帧像素素材；程序化造型退役为 fallback（保留在 ans_chars.js）。
 const charsPath = path.join(APP, "src", "ans_chars.js");
-if (!exists(charsPath)) check("A1 主角文件存在", false, charsPath);
-else {
-  const h = sha(charsPath);
-  check("A1 V4.6 造型冻结（ans_chars.js 字节未变）", h === FROZEN_CHARS_SHA256,
-    h === FROZEN_CHARS_SHA256 ? "sha256 一致" : `sha256=${h.slice(0, 16)}… 期望 ${FROZEN_CHARS_SHA256.slice(0, 16)}…`);
-}
+const chars = exists(charsPath) ? read(charsPath) : "";
+const DINO2_EXPECT = { walk: 8, idle: 8, actions: 8, memes: 9, memes2: 9, memes3: 9, standup: 4 };
+const dino2Dir = path.join(APP, "assets", "dino2");
+let dino2ok = exists(dino2Dir), dino2detail = [];
+if (dino2ok) {
+  for (const [set, n] of Object.entries(DINO2_EXPECT)) {
+    const dir = path.join(dino2Dir, set);
+    const got = exists(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".png")).length : 0;
+    if (got !== n) dino2ok = false;
+    dino2detail.push(set + ":" + got + "/" + n);
+  }
+} else dino2detail.push("缺少 assets/dino2");
+check("A1 像素 IP 恐龙素材齐备（55 帧 = walk8/idle8/actions8/memes9x3/standup4）", dino2ok, dino2detail.join(" "));
+check("A2 ans_chars.js 已接像素精灵（preloadDino2 + dinoSprite），程序化造型保留为 fallback",
+  /preloadDino2/.test(chars) && /dinoSprite/.test(chars) && /function\s+dino\s*\(/.test(chars), "preloadDino2 / dinoSprite / dino()");
+check("A3 精灵走 2D 合成层（core.js 提供 sprite()），不直接进 WEBGL 层",
+  /function\s+sprite\s*\(|sprite\s*\(/.test(read(path.join(APP, "src", "core.js"))), "core.js sprite()");
 
 // ── B. 时长一致（config / 场景 / 音频时间轴三处）─────────────────────
 const cfg = read(path.join(APP, "src", "config.js"));
@@ -123,6 +136,13 @@ check("E2 字幕函数内 letter() 调用数 = 2（章节 chip + 正文，定稿
 check("F1 未回退为 78 BPM（已否决的慢速方案）", !/bpm:\s*78/.test(cfg) && !/MUSIC_DOWNBEAT\s*=\s*0\.0/.test(cfg),
   "config.js 无 78 BPM / 无 0.0 相位");
 check("F2 帧对齐拍点函数存在（pulseF）", /function\s+pulseF/.test(read(path.join(APP, "src", "core.js"))) || /pulseF\s*\(/.test(scene), "core.js / scene");
+
+// ── G. 影片定位（2026-10-21 用户确认）──────────────────────────────
+// 本片 = ANS 官方宣发：主角固定为「主理人 + 像素 IP 小恐龙」；
+// 主理人不替换为大肥鱼（大肥鱼 + 小恐龙的 B 站账号人设片是另一支资产）。
+check("G1 本片为 ANS 官方宣发（主理人保留、不引用大肥鱼角色素材）",
+  /function\s+creator\s*\(/.test(chars) && !/whale[-_]?lady|deepseek-whale|lady-1024|大肥鱼[\s\S]{0,8}(形象|角色|素材)/i.test(scene),
+  "创作者函数在；场景未引用大肥鱼角色素材（Act2 卡片上的『大肥鱼』是模型名，允许）");
 
 // ── 输出 ───────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.ok);

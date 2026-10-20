@@ -17,7 +17,7 @@ function drawWorld(t) {
   else {
     let i = 0; while (i + 1 < SHOTS.length && t >= SHOTS[i + 1][0]) i++;
     const t0 = SHOTS[i][0], end = i + 1 < SHOTS.length ? SHOTS[i + 1][0] : DUR;
-    SHOTS[i][1](t, t - t0, end - t0);
+    SHOTS[i][1](t, WARP(t) - t0, end - t0);      // lt 走"演出时钟"：屏息窗内整幕减速（预备态）
     CAM = null;
   }
   flushLetters();
