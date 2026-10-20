@@ -1,7 +1,9 @@
 // core.js: constants, helpers, paper, paint wrapper, compositing and render hooks.
 // Length and rhythm come from PROJECT in config.js.
 const W = 1920, H = 1080;
-const BPM = PROJECT.bpm, BEAT = 60 / BPM, OFF = PROJECT.offset || 0, BOIL = 12, DUR = PROJECT.duration;
+// BOIL 8 = 每张手绘线保持 3 帧（≈8fps）。原来是 12（保持 2 帧），在 1080p 1:1 下被读成"全片乱闪"。
+const BPM = PROJECT.bpm, BEAT = 60 / BPM, OFF = PROJECT.offset || 0, BOIL = 8, DUR = PROJECT.duration;
+const JITK = 0.5;   // 手绘抖动幅度系数（抗闪：取原始抖动的一半）
 const TAU = Math.PI * 2;
 const PAL = {
   paper: '#F3EBDC', ink: '#2B2233', clay: '#D97757', clayDk: '#A84D33', clayLt: '#F2A283',
@@ -17,7 +19,7 @@ const backOut = x => { x = clamp(x); const s = 1.9; return 1 + (s + 1) * Math.po
 const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const bpOf = t => (t - OFF) / BEAT;
 // Seeded by the boil frame, so linework "boils" at BOIL fps like hand-drawn animation.
-const jit = a => (random() * 2 - 1) * a;
+const jit = a => (random() * 2 - 1) * a * JITK;
 // Each boil drawing holds for several frames, so whatever isn't moving must draw the same until the next one. But a moving
 // thing uses a different amount of randomness each frame, which shifts the stream for everything drawn after it and makes
 // that re-boil every frame (jitter). boilSeed(key) restarts the stream from the boil frame and a key (any string or
@@ -30,6 +32,16 @@ const seg = (t, a, b) => clamp((t - a) / (b - a));                 // 0..1 progr
 const frac = x => x - Math.floor(x);
 const beatN = t => Math.floor(bpOf(t));                            // integer beat index
 const pulse = (t, k = 6) => Math.exp(-frac(bpOf(t)) * k);          // 1 exactly on each beat, decays after
+// 拍点闪烁（帧对齐版）：124 BPM 的拍长 = 11.6129 帧，不是整数帧，解析拍点有时落在两帧之间，
+// pulse() 的尖峰会被整帧漏掉（实测帧 27/50/85/108/143 采到 0.05）。pulseF() 把拍点吸附到最近
+// 采样帧，保证"每一拍必有一帧在闪、且只有该帧附近在闪"，可与 music_grid.beat_frames 逐帧核对。
+const pulseF = (t, k = 2) => {
+  const n = Math.round((t - OFF) / BEAT);                    // 最近拍号（可为负）
+  if (n < 0) return 0;                                       // 首个 downbeat 之前一律不闪（片头无音乐）
+  const df = Math.abs((t - OFF) - n * BEAT) * 24;            // 距该拍还有几帧
+  return df >= k ? 0 : Math.pow(1 - df / k, 1.5);
+};
+const pulse2F = (t, k = 2) => pulseF(t + BEAT / 2, k);                  // 半拍网格（八分音符）
 const pulse2 = (t, k = 6) => Math.exp(-frac(bpOf(t) * 2) * k);     // same on eighth notes
 const wob = (t, f = 1, ph = 0) => Math.sin((t * f + ph) * TAU);
 const easeIn = x => Math.pow(clamp(x), 3);
@@ -105,7 +117,7 @@ function flash(k, col = '#FFFDF6') { if (k > .01) paint(rectPts(-60, -60, W + 12
 function glow(x, y, r, col = '#FFC766', a = 1) {
   if (a <= 0 || r < 1) return;
   flushBrush();
-  const c = color(col), rr = r * (1 + jit(.03));
+  const c = color(col), rr = r;                     // 光晕不再随 boil 抖动（每 3 帧抖一次 = 全片微闪）
   push(); blendMode(ADD); tint(red(c), green(c), blue(c), 150 * clamp(a)); image(glowTex, x - rr, y - rr, 2 * rr, 2 * rr); noTint(); blendMode(BLEND); pop();
 }
 function makeGlowTex() {
@@ -257,7 +269,7 @@ function makePaper() {
 function makeGrain() {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'), rnd = lcg(5);
   const id = c.createImageData(W, H), d = id.data;
-  for (let i = 0; i < d.length; i += 4) { const v = 255 - (rnd() < .55 ? rnd() * rnd() * 34 : 0); d[i] = v; d[i + 1] = v - 1; d[i + 2] = v - 3; d[i + 3] = 255; }
+  for (let i = 0; i < d.length; i += 4) { const v = 255 - (rnd() < .55 ? rnd() * rnd() * 24 : 0); d[i] = v; d[i + 1] = v - 1; d[i + 2] = v - 3; d[i + 3] = 255; }
   c.putImageData(id, 0, 0);
   const g = c.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(120,95,70,.35)');
   c.fillStyle = g; c.fillRect(0, 0, W, H);

@@ -1,0 +1,1608 @@
+window.__ANS_DAY01_TIMELINE = {
+  "project": "ANS (AI Never Stops) · Day 01 / 28",
+  "generated_by": "ClaudeAnimationBase/audio/build_day01_audio.py",
+  "provider": "doubao",
+  "provider_detail": "seed-tts-2.0-expressive/zh_male_taocheng_uranus_bigtts",
+  "provider_note": "时长按豆包实测，Fish 到位后需重测",
+  "speed": 1.12,
+  "fps": 24,
+  "lead_in": 0.25,
+  "act_gap": 0.9,
+  "tail": 2.506,
+  "total_duration": 45.9,
+  "total_frames": 1102,
+  "video": {
+    "fps": 24,
+    "duration": 45.9,
+    "frames": 1102
+  },
+  "segments": [
+    {
+      "id": "S1",
+      "act": 1,
+      "start": 0.25,
+      "dur": 7.227,
+      "end": 6.577,
+      "voice_dur": 6.327,
+      "start_frame": 6,
+      "end_frame": 158,
+      "frames": 152,
+      "subtitle": "刷了那么多 AI，最后只剩下 99+ 的吃灰收藏夹和一堆聊天记录。别慌，ANS 来了。",
+      "tts": "刷了那么多 AI，最后只剩下 99+ 的吃灰收藏夹和一堆聊天记录。别慌，ANS 来了。",
+      "verbatim_match": true,
+      "estimated": false,
+      "source": "doubao:seed-tts-2.0-expressive"
+    },
+    {
+      "id": "S2",
+      "act": 2,
+      "start": 7.477,
+      "dur": 7.733,
+      "end": 14.31,
+      "voice_dur": 6.833,
+      "start_frame": 179,
+      "end_frame": 343,
+      "frames": 164,
+      "subtitle": "第一件，顶配旗舰模型一站直连。GPT-6-Astra、大肥鱼 v4.1、Opus 5.5，全部满血开跑。",
+      "tts": "第一件，顶配旗舰模型一站直连。GPT-6-Astra、大肥鱼 v4.1、Opus 5.5，全部满血开跑。",
+      "verbatim_match": true,
+      "estimated": false,
+      "source": "doubao:seed-tts-2.0-expressive"
+    },
+    {
+      "id": "S3",
+      "act": 3,
+      "start": 15.21,
+      "dur": 9.026,
+      "end": 23.336,
+      "voice_dur": 8.126,
+      "start_frame": 365,
+      "end_frame": 560,
+      "frames": 195,
+      "subtitle": "第二件，最快时间上手顶级 AI 项目。不用到处翻教程配环境。全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品。",
+      "tts": "第二件，最快时间上手顶级 AI 项目。不用到处翻教程配环境。全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品。",
+      "verbatim_match": true,
+      "estimated": false,
+      "source": "doubao:seed-tts-2.0-expressive"
+    },
+    {
+      "id": "S4",
+      "act": 4,
+      "start": 24.236,
+      "dur": 5.357,
+      "end": 28.693,
+      "voice_dur": 4.457,
+      "start_frame": 582,
+      "end_frame": 689,
+      "frames": 107,
+      "subtitle": "第三件，注册即送算力福利。进来就有免费额度，直接开造，不玩套路。",
+      "tts": "第三件，注册即送算力福利。进来就有免费额度，直接开造，不玩套路。",
+      "verbatim_match": true,
+      "estimated": false,
+      "source": "doubao:seed-tts-2.0-expressive"
+    },
+    {
+      "id": "S5",
+      "act": 5,
+      "start": 29.593,
+      "dur": 16.307,
+      "end": 43.394,
+      "voice_dur": 13.801,
+      "start_frame": 710,
+      "end_frame": 1041,
+      "frames": 331,
+      "subtitle": "立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）。让改进开始吧。",
+      "tts": "立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）。让改进开始吧。",
+      "verbatim_match": true,
+      "estimated": false,
+      "source": "doubao:seed-tts-2.0-expressive"
+    }
+  ],
+  "acts": [
+    {
+      "act": 1,
+      "name": "痛点破局 · 99+ 吃灰收藏夹",
+      "segment": "S1",
+      "start": 0.0,
+      "end": 6.833,
+      "dur": 6.833,
+      "vo_start": 0.25,
+      "vo_end": 6.577,
+      "wipe": null,
+      "wipe_frame": null,
+      "transition_start": null,
+      "transition_end": null,
+      "start_frame": 0,
+      "end_frame": 164
+    },
+    {
+      "act": 2,
+      "name": "第一件事 · 顶配旗舰模型一站直连",
+      "segment": "S2",
+      "start": 6.833,
+      "end": 14.76,
+      "dur": 7.927,
+      "vo_start": 7.477,
+      "vo_end": 14.31,
+      "wipe": 6.833,
+      "wipe_frame": 164,
+      "transition_start": 6.577,
+      "transition_end": 7.477,
+      "start_frame": 164,
+      "end_frame": 354
+    },
+    {
+      "act": 3,
+      "name": "第二件事 · 最快上手顶级 AI 项目",
+      "segment": "S3",
+      "start": 14.76,
+      "end": 23.786,
+      "dur": 9.026,
+      "vo_start": 15.21,
+      "vo_end": 23.336,
+      "wipe": 14.76,
+      "wipe_frame": 354,
+      "transition_start": 14.31,
+      "transition_end": 15.21,
+      "start_frame": 354,
+      "end_frame": 571
+    },
+    {
+      "act": 4,
+      "name": "第三件事 · 注册即送算力福利",
+      "segment": "S4",
+      "start": 23.786,
+      "end": 28.85,
+      "dur": 5.064,
+      "vo_start": 24.236,
+      "vo_end": 28.693,
+      "wipe": 23.786,
+      "wipe_frame": 571,
+      "transition_start": 23.336,
+      "transition_end": 24.236,
+      "start_frame": 571,
+      "end_frame": 692
+    },
+    {
+      "act": 5,
+      "name": "28 天 Flag · 真改进 / Full Reset",
+      "segment": "S5",
+      "start": 28.85,
+      "end": 45.9,
+      "dur": 17.05,
+      "vo_start": 29.593,
+      "vo_end": 43.394,
+      "wipe": 28.85,
+      "wipe_frame": 692,
+      "transition_start": 28.693,
+      "transition_end": 29.593,
+      "start_frame": 692,
+      "end_frame": 1102
+    }
+  ],
+  "wipes": [
+    {
+      "act": 2,
+      "t": 6.833,
+      "frame": 164,
+      "frame_time": 6.833333,
+      "gap": [
+        6.577,
+        7.477
+      ],
+      "source": "picture-locked"
+    },
+    {
+      "act": 3,
+      "t": 14.76,
+      "frame": 354,
+      "frame_time": 14.75,
+      "gap": [
+        14.31,
+        15.21
+      ],
+      "source": "picture-locked"
+    },
+    {
+      "act": 4,
+      "t": 23.786,
+      "frame": 571,
+      "frame_time": 23.791667,
+      "gap": [
+        23.336,
+        24.236
+      ],
+      "source": "picture-locked"
+    },
+    {
+      "act": 5,
+      "t": 28.85,
+      "frame": 692,
+      "frame_time": 28.833333,
+      "gap": [
+        28.693,
+        29.593
+      ],
+      "source": "picture-locked"
+    }
+  ],
+  "end_card": {
+    "audio_tail_start": 43.394,
+    "picture_start": 43.7,
+    "end": 45.9,
+    "dur": 2.2,
+    "audio_tail_dur": 2.506,
+    "picture_start_frame": 1049,
+    "end_frame": 1102,
+    "final_beat": 44.833333,
+    "final_beat_frame": 1076,
+    "pad_db_rel_voice": -12.0
+  },
+  "sub_clause_plan": [
+    {
+      "seg": "S1",
+      "act": 1,
+      "idx": 0,
+      "text": "刷了那么多 AI，最后只剩下 99+ 的吃灰收藏夹和一堆聊天记录。",
+      "start": 0.25,
+      "dur": 4.864,
+      "end": 5.114,
+      "frame_start": 6,
+      "frame_end": 123,
+      "source": "silence",
+      "chars": 33,
+      "units": 32.8,
+      "pause_after_s": 0.453
+    },
+    {
+      "seg": "S1",
+      "act": 1,
+      "idx": 1,
+      "text": "别慌，ANS 来了。",
+      "start": 5.114,
+      "dur": 1.463,
+      "end": 6.577,
+      "frame_start": 123,
+      "frame_end": 158,
+      "source": "silence",
+      "chars": 10,
+      "units": 10.9,
+      "pause_after_s": 0.0
+    },
+    {
+      "seg": "S2",
+      "act": 2,
+      "idx": 0,
+      "text": "第一件，顶配旗舰模型一站直连。",
+      "start": 7.477,
+      "dur": 2.419,
+      "end": 9.896,
+      "frame_start": 179,
+      "frame_end": 238,
+      "source": "silence",
+      "chars": 15,
+      "units": 17.6,
+      "pause_after_s": 0.17
+    },
+    {
+      "seg": "S2",
+      "act": 2,
+      "idx": 1,
+      "text": "GPT-6-Astra、大肥鱼 v4.1、Opus 5.5，全部满血开跑。",
+      "start": 9.896,
+      "dur": 4.414,
+      "end": 14.31,
+      "frame_start": 238,
+      "frame_end": 343,
+      "source": "silence",
+      "chars": 37,
+      "units": 30.6,
+      "pause_after_s": 0.0
+    },
+    {
+      "seg": "S3",
+      "act": 3,
+      "idx": 0,
+      "text": "第二件，最快时间上手顶级 AI 项目。",
+      "start": 15.21,
+      "dur": 2.417,
+      "end": 17.627,
+      "frame_start": 365,
+      "frame_end": 423,
+      "source": "silence",
+      "chars": 19,
+      "units": 20.2,
+      "pause_after_s": 0.332
+    },
+    {
+      "seg": "S3",
+      "act": 3,
+      "idx": 1,
+      "text": "不用到处翻教程配环境。",
+      "start": 17.627,
+      "dur": 1.689,
+      "end": 19.316,
+      "frame_start": 423,
+      "frame_end": 464,
+      "source": "silence",
+      "chars": 11,
+      "units": 13.0,
+      "pause_after_s": 0.274
+    },
+    {
+      "seg": "S3",
+      "act": 3,
+      "idx": 2,
+      "text": "全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品。",
+      "start": 19.316,
+      "dur": 4.02,
+      "end": 23.336,
+      "frame_start": 464,
+      "frame_end": 560,
+      "source": "silence",
+      "chars": 34,
+      "units": 35.8,
+      "pause_after_s": 0.0
+    },
+    {
+      "seg": "S4",
+      "act": 4,
+      "idx": 0,
+      "text": "第三件，注册即送算力福利。",
+      "start": 24.236,
+      "dur": 1.944,
+      "end": 26.18,
+      "frame_start": 582,
+      "frame_end": 628,
+      "source": "silence",
+      "chars": 13,
+      "units": 15.6,
+      "pause_after_s": 0.384
+    },
+    {
+      "seg": "S4",
+      "act": 4,
+      "idx": 1,
+      "text": "进来就有免费额度，直接开造，不玩套路。",
+      "start": 26.18,
+      "dur": 2.513,
+      "end": 28.693,
+      "frame_start": 628,
+      "frame_end": 689,
+      "source": "silence",
+      "chars": 19,
+      "units": 22.2,
+      "pause_after_s": 0.0
+    },
+    {
+      "seg": "S5",
+      "act": 5,
+      "idx": 0,
+      "text": "立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——",
+      "start": 29.593,
+      "dur": 4.606,
+      "end": 34.199,
+      "frame_start": 710,
+      "frame_end": 821,
+      "source": "silence",
+      "chars": 41,
+      "units": 36.8,
+      "pause_after_s": 0.389
+    },
+    {
+      "seg": "S5",
+      "act": 5,
+      "idx": 1,
+      "text": "要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）。",
+      "start": 34.199,
+      "dur": 8.217,
+      "end": 42.416,
+      "frame_start": 821,
+      "frame_end": 1018,
+      "source": "silence",
+      "chars": 65,
+      "units": 61.0,
+      "pause_after_s": 0.272
+    },
+    {
+      "seg": "S5",
+      "act": 5,
+      "idx": 2,
+      "text": "让改进开始吧。",
+      "start": 42.416,
+      "dur": 0.978,
+      "end": 43.394,
+      "frame_start": 1018,
+      "frame_end": 1041,
+      "source": "silence",
+      "chars": 7,
+      "units": 9.0,
+      "pause_after_s": 0.0
+    }
+  ],
+  "sub_clause_plan_meta": {
+    "count": 12,
+    "by_silence": 12,
+    "by_proportional": 0,
+    "fps": 24,
+    "delimiters": [
+      "。",
+      "！",
+      "？",
+      "——"
+    ],
+    "note": "verbatim per-sentence subtitle plan; concatenating a segment's clauses reproduces its spoken text byte for byte; times come from 12 ms-envelope silence detection on the same TTS clips the mix uses (source=silence) or from character-weighted interpolation (source=proportional)"
+  },
+  "music_grid": {
+    "bpm": 124.0,
+    "beat_seconds": 0.483871,
+    "bar_seconds": 1.935484,
+    "beats_per_bar": 4,
+    "first_beat_t": 1.1274,
+    "first_beat_frame": 27,
+    "first_downbeat_t": 1.1274,
+    "first_downbeat_frame": 27,
+    "beat_frames": [
+      27,
+      39,
+      50,
+      62,
+      74,
+      85,
+      97,
+      108,
+      120,
+      132,
+      143,
+      155,
+      166,
+      178,
+      190,
+      201,
+      213,
+      224,
+      236,
+      248,
+      259,
+      271,
+      283,
+      294,
+      306,
+      317,
+      329,
+      341,
+      352,
+      364,
+      375,
+      387,
+      399,
+      410,
+      422,
+      434,
+      445,
+      457,
+      468,
+      480,
+      492,
+      503,
+      515,
+      526,
+      538,
+      550,
+      561,
+      573,
+      584,
+      596,
+      608,
+      619,
+      631,
+      643,
+      654,
+      666,
+      677,
+      689,
+      701,
+      712,
+      724,
+      735,
+      747,
+      759,
+      770,
+      782,
+      794,
+      805,
+      817,
+      828,
+      840,
+      852,
+      863,
+      875,
+      886,
+      898,
+      910,
+      921,
+      933,
+      944,
+      956,
+      968,
+      979,
+      991,
+      1003,
+      1014,
+      1026,
+      1037,
+      1049,
+      1061,
+      1072,
+      1084,
+      1095
+    ],
+    "bar_frames": [
+      27,
+      74,
+      120,
+      166,
+      213,
+      259,
+      306,
+      352,
+      399,
+      445,
+      492,
+      538,
+      584,
+      631,
+      677,
+      724,
+      770,
+      817,
+      863,
+      910,
+      956,
+      1003,
+      1049,
+      1095
+    ],
+    "beat_times": [
+      1.1274,
+      1.6113,
+      2.0952,
+      2.579,
+      3.0629,
+      3.5468,
+      4.0306,
+      4.5145,
+      4.9984,
+      5.4823,
+      5.9661,
+      6.45,
+      6.9339,
+      7.4177,
+      7.9016,
+      8.3855,
+      8.8694,
+      9.3532,
+      9.8371,
+      10.321,
+      10.8048,
+      11.2887,
+      11.7726,
+      12.2565,
+      12.7403,
+      13.2242,
+      13.7081,
+      14.1919,
+      14.6758,
+      15.1597,
+      15.6435,
+      16.1274,
+      16.6113,
+      17.0952,
+      17.579,
+      18.0629,
+      18.5468,
+      19.0306,
+      19.5145,
+      19.9984,
+      20.4823,
+      20.9661,
+      21.45,
+      21.9339,
+      22.4177,
+      22.9016,
+      23.3855,
+      23.8694,
+      24.3532,
+      24.8371,
+      25.321,
+      25.8048,
+      26.2887,
+      26.7726,
+      27.2565,
+      27.7403,
+      28.2242,
+      28.7081,
+      29.1919,
+      29.6758,
+      30.1597,
+      30.6435,
+      31.1274,
+      31.6113,
+      32.0952,
+      32.579,
+      33.0629,
+      33.5468,
+      34.0306,
+      34.5145,
+      34.9984,
+      35.4823,
+      35.9661,
+      36.45,
+      36.9339,
+      37.4177,
+      37.9016,
+      38.3855,
+      38.8694,
+      39.3532,
+      39.8371,
+      40.321,
+      40.8048,
+      41.2887,
+      41.7726,
+      42.2565,
+      42.7403,
+      43.2242,
+      43.7081,
+      44.1919,
+      44.6758,
+      45.1597,
+      45.6435
+    ],
+    "bar_times": [
+      1.1274,
+      3.0629,
+      4.9984,
+      6.9339,
+      8.8694,
+      10.8048,
+      12.7403,
+      14.6758,
+      16.6113,
+      18.5468,
+      20.4823,
+      22.4177,
+      24.3532,
+      26.2887,
+      28.2242,
+      30.1597,
+      32.0952,
+      34.0306,
+      35.9661,
+      37.9016,
+      39.8371,
+      41.7726,
+      43.7081,
+      45.6435
+    ],
+    "beat_count": 93,
+    "bar_count": 24,
+    "frame_seconds": 0.041667,
+    "source": "composed (mgaudio, exact tempo - no estimation)",
+    "analysis": {
+      "method": "authored grid: bpm fixed by --bpm, phase chosen to minimise the distance from the picture's cuts to the nearest beat"
+    }
+  },
+  "bed": {
+    "sections": [
+      {
+        "name": "intro",
+        "start": 0.0,
+        "end": 6.833
+      },
+      {
+        "name": "act2",
+        "start": 6.833,
+        "end": 14.75
+      },
+      {
+        "name": "act3",
+        "start": 14.75,
+        "end": 23.792
+      },
+      {
+        "name": "act4",
+        "start": 23.792,
+        "end": 28.833
+      },
+      {
+        "name": "act5",
+        "start": 28.833,
+        "end": 43.708
+      },
+      {
+        "name": "outro",
+        "start": 43.708,
+        "end": 45.9
+      }
+    ],
+    "cut_events": [
+      {
+        "t": 6.833333,
+        "frame": 164,
+        "kind": "fill(4x16th tom)+kick+crash+bass"
+      },
+      {
+        "t": 14.75,
+        "frame": 354,
+        "kind": "fill(4x16th tom)+kick+crash+bass"
+      },
+      {
+        "t": 23.791667,
+        "frame": 571,
+        "kind": "fill(4x16th tom)+kick+crash+bass"
+      },
+      {
+        "t": 28.833333,
+        "frame": 692,
+        "kind": "fill(4x16th tom)+kick+crash+bass"
+      },
+      {
+        "t": 43.708333,
+        "frame": 1049,
+        "kind": "fill(4x16th tom)+kick+crash+bass"
+      }
+    ],
+    "parts": [
+      "kick",
+      "sub",
+      "bass",
+      "clap",
+      "hats",
+      "shaker",
+      "arp",
+      "lead",
+      "pad",
+      "perc"
+    ],
+    "note": "authored with the mg-styles-15 mgaudio engine (drums/synth/pluck/fm + Mix/Track)",
+    "n_beats": 94,
+    "n_bars": 24,
+    "cache_tag": "d77abd20f3f5",
+    "bpm": 124.0,
+    "anchor": 1.12742,
+    "cache": "cache",
+    "source": "composed"
+  },
+  "wipe_beat_alignment": [
+    {
+      "wipe": 6.833,
+      "beat": 6.9339,
+      "offset_ms": 100.9,
+      "offset_frames": 2.42,
+      "mark": false
+    },
+    {
+      "wipe": 14.76,
+      "beat": 14.6758,
+      "offset_ms": -84.2,
+      "offset_frames": -2.02,
+      "mark": false
+    },
+    {
+      "wipe": 23.786,
+      "beat": 23.8693,
+      "offset_ms": 83.3,
+      "offset_frames": 2.0,
+      "mark": false
+    },
+    {
+      "wipe": 28.85,
+      "beat": 28.708,
+      "offset_ms": -142.0,
+      "offset_frames": -3.41,
+      "mark": true
+    }
+  ],
+  "wipe_beat_alignment_note": "nearest grid beat to each cut; in composed mode the bed ALSO places frame-locked kick+crash+bass exactly ON the cut, so the audible hit is 0 frames off",
+  "sfx_count_note": "16 SFX cues; the bed's own musical events are not counted as SFX",
+  "sfx_count": 16,
+  "sfx_list": [
+    {
+      "n": 1,
+      "name": "pop",
+      "t": 0.125,
+      "frame": 3,
+      "sync": "start",
+      "gain": 0.16,
+      "kind": "film_open",
+      "note": "开场 pop"
+    },
+    {
+      "n": 2,
+      "name": "hit",
+      "t": 6.833333333333333,
+      "frame": 164,
+      "sync": "start",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "note": "幕2 擦除重音·低频冲击（tight punch，帧 164）"
+    },
+    {
+      "n": 3,
+      "name": "tear",
+      "t": 6.833333333333333,
+      "frame": 164,
+      "sync": "start",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "note": "幕2 擦除重音·纸撕裂层（帧 164）"
+    },
+    {
+      "n": 4,
+      "name": "riser",
+      "t": 6.833333333333333,
+      "frame": 164,
+      "sync": "end",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "note": "幕2 推入 riser（尾端=切点帧 164）"
+    },
+    {
+      "n": 5,
+      "name": "hit",
+      "t": 14.75,
+      "frame": 354,
+      "sync": "start",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "note": "幕3 擦除重音·低频冲击（tight punch，帧 354）"
+    },
+    {
+      "n": 6,
+      "name": "tear",
+      "t": 14.75,
+      "frame": 354,
+      "sync": "start",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "note": "幕3 擦除重音·纸撕裂层（帧 354）"
+    },
+    {
+      "n": 7,
+      "name": "riser",
+      "t": 14.75,
+      "frame": 354,
+      "sync": "end",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "note": "幕3 推入 riser（尾端=切点帧 354）"
+    },
+    {
+      "n": 8,
+      "name": "hit",
+      "t": 23.791666666666668,
+      "frame": 571,
+      "sync": "start",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "note": "幕4 擦除重音·低频冲击（tight punch，帧 571）"
+    },
+    {
+      "n": 9,
+      "name": "tear",
+      "t": 23.791666666666668,
+      "frame": 571,
+      "sync": "start",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "note": "幕4 擦除重音·纸撕裂层（帧 571）"
+    },
+    {
+      "n": 10,
+      "name": "riser",
+      "t": 23.791666666666668,
+      "frame": 571,
+      "sync": "end",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "note": "幕4 推入 riser（尾端=切点帧 571）"
+    },
+    {
+      "n": 11,
+      "name": "hit",
+      "t": 28.833333333333332,
+      "frame": 692,
+      "sync": "start",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "note": "幕5 擦除重音·低频冲击（tight punch，帧 692）"
+    },
+    {
+      "n": 12,
+      "name": "tear",
+      "t": 28.833333333333332,
+      "frame": 692,
+      "sync": "start",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "note": "幕5 擦除重音·纸撕裂层（帧 692）"
+    },
+    {
+      "n": 13,
+      "name": "riser",
+      "t": 28.833333333333332,
+      "frame": 692,
+      "sync": "end",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "note": "幕5 推入 riser（尾端=切点帧 692）"
+    },
+    {
+      "n": 14,
+      "name": "reverse",
+      "t": 43.708333333333336,
+      "frame": 1049,
+      "sync": "end",
+      "gain": 0.18,
+      "kind": "endcard",
+      "note": "落版反镲推入（峰值=画面落版首帧 1049 / 43.700 s）"
+    },
+    {
+      "n": 15,
+      "name": "boom",
+      "t": 43.708333333333336,
+      "frame": 1049,
+      "sync": "start",
+      "gain": 0.3,
+      "kind": "endcard",
+      "note": "落版落地 sub boom（帧 1049）"
+    },
+    {
+      "n": 16,
+      "name": "chime",
+      "t": 44.833333,
+      "frame": 1076,
+      "sync": "start",
+      "gain": 0.26,
+      "kind": "endcard",
+      "note": "落版最后一拍 chime（帧 1076）"
+    }
+  ],
+  "sfx_cues": [
+    {
+      "t": 0.125,
+      "name": "pop",
+      "gain": 0.16,
+      "kind": "film_open",
+      "frame": 3,
+      "sync": "start",
+      "note": "开场 pop"
+    },
+    {
+      "t": 6.833333333333333,
+      "name": "hit",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "frame": 164,
+      "sync": "start",
+      "note": "幕2 擦除重音·低频冲击（tight punch，帧 164）"
+    },
+    {
+      "t": 6.833333333333333,
+      "name": "tear",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "frame": 164,
+      "sync": "start",
+      "note": "幕2 擦除重音·纸撕裂层（帧 164）"
+    },
+    {
+      "t": 6.833333333333333,
+      "name": "riser",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "frame": 164,
+      "sync": "end",
+      "note": "幕2 推入 riser（尾端=切点帧 164）"
+    },
+    {
+      "t": 14.75,
+      "name": "hit",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "frame": 354,
+      "sync": "start",
+      "note": "幕3 擦除重音·低频冲击（tight punch，帧 354）"
+    },
+    {
+      "t": 14.75,
+      "name": "tear",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "frame": 354,
+      "sync": "start",
+      "note": "幕3 擦除重音·纸撕裂层（帧 354）"
+    },
+    {
+      "t": 14.75,
+      "name": "riser",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "frame": 354,
+      "sync": "end",
+      "note": "幕3 推入 riser（尾端=切点帧 354）"
+    },
+    {
+      "t": 23.791666666666668,
+      "name": "hit",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "frame": 571,
+      "sync": "start",
+      "note": "幕4 擦除重音·低频冲击（tight punch，帧 571）"
+    },
+    {
+      "t": 23.791666666666668,
+      "name": "tear",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "frame": 571,
+      "sync": "start",
+      "note": "幕4 擦除重音·纸撕裂层（帧 571）"
+    },
+    {
+      "t": 23.791666666666668,
+      "name": "riser",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "frame": 571,
+      "sync": "end",
+      "note": "幕4 推入 riser（尾端=切点帧 571）"
+    },
+    {
+      "t": 28.833333333333332,
+      "name": "hit",
+      "gain": 0.8,
+      "kind": "wipe_accent",
+      "frame": 692,
+      "sync": "start",
+      "note": "幕5 擦除重音·低频冲击（tight punch，帧 692）"
+    },
+    {
+      "t": 28.833333333333332,
+      "name": "tear",
+      "gain": 0.25,
+      "kind": "wipe_accent",
+      "frame": 692,
+      "sync": "start",
+      "note": "幕5 擦除重音·纸撕裂层（帧 692）"
+    },
+    {
+      "t": 28.833333333333332,
+      "name": "riser",
+      "gain": 0.05,
+      "kind": "wipe_build",
+      "frame": 692,
+      "sync": "end",
+      "note": "幕5 推入 riser（尾端=切点帧 692）"
+    },
+    {
+      "t": 43.708333333333336,
+      "name": "reverse",
+      "gain": 0.18,
+      "kind": "endcard",
+      "frame": 1049,
+      "sync": "end",
+      "note": "落版反镲推入（峰值=画面落版首帧 1049 / 43.700 s）"
+    },
+    {
+      "t": 43.708333333333336,
+      "name": "boom",
+      "gain": 0.3,
+      "kind": "endcard",
+      "frame": 1049,
+      "sync": "start",
+      "note": "落版落地 sub boom（帧 1049）"
+    },
+    {
+      "t": 44.833333,
+      "name": "chime",
+      "gain": 0.26,
+      "kind": "endcard",
+      "frame": 1076,
+      "sync": "start",
+      "note": "落版最后一拍 chime（帧 1076）"
+    }
+  ],
+  "ride": {
+    "db": 10.77,
+    "dur": 1.2,
+    "ramp": 1.6,
+    "settle_db": -3.0,
+    "start": 40.594,
+    "peak_at": 43.394,
+    "reference": "level ride on the WHOLE mix (voice+music+FX+pad together) -> the D9 voice/bed separation is preserved"
+  },
+  "d9": {
+    "gap_6.95_7.45": {
+      "window": [
+        6.95,
+        7.45
+      ],
+      "rms_total": -24.66,
+      "voice_ref": -17.25,
+      "separation_db": 7.41,
+      "pad_rms": -180.0,
+      "riser_rms": -180.0,
+      "hit_rms": -36.57
+    },
+    "endcard_43.70_45.90": {
+      "window": [
+        43.7,
+        45.9
+      ],
+      "rms_total": -25.07,
+      "voice_ref": -10.38,
+      "separation_db": 14.7,
+      "pad_rms": -29.93,
+      "riser_rms": -180.0,
+      "hit_rms": -180.0
+    }
+  },
+  "music_arc": {
+    "reference": "dB relative to the voice body RMS (master pins that at --body-rms-target)",
+    "body_db": -13.0,
+    "gap_db": -13.5,
+    "dip_db": -6.0,
+    "dip_abs_db": -19.5,
+    "dip_dur": 0.55,
+    "act5_db": -13.0,
+    "endcard_db": -12.0,
+    "breakpoints": [
+      [
+        0.0,
+        -70.0
+      ],
+      [
+        0.01,
+        -13.5
+      ],
+      [
+        0.22,
+        -13.5
+      ],
+      [
+        0.35,
+        -13.0
+      ],
+      [
+        6.173,
+        -13.0
+      ],
+      [
+        6.233,
+        -13.5
+      ],
+      [
+        6.303,
+        -19.5
+      ],
+      [
+        6.823,
+        -19.5
+      ],
+      [
+        6.883,
+        -11.5
+      ],
+      [
+        7.177,
+        -13.5
+      ],
+      [
+        7.283,
+        -13.5
+      ],
+      [
+        7.577,
+        -13.0
+      ],
+      [
+        14.1,
+        -13.0
+      ],
+      [
+        14.16,
+        -13.5
+      ],
+      [
+        14.23,
+        -19.5
+      ],
+      [
+        14.75,
+        -19.5
+      ],
+      [
+        14.81,
+        -11.5
+      ],
+      [
+        14.91,
+        -13.5
+      ],
+      [
+        15.21,
+        -13.5
+      ],
+      [
+        15.31,
+        -13.0
+      ],
+      [
+        23.126,
+        -13.0
+      ],
+      [
+        23.186,
+        -13.5
+      ],
+      [
+        23.256,
+        -19.5
+      ],
+      [
+        23.776,
+        -19.5
+      ],
+      [
+        23.836,
+        -11.5
+      ],
+      [
+        23.936,
+        -13.5
+      ],
+      [
+        24.236,
+        -13.5
+      ],
+      [
+        24.336,
+        -13.0
+      ],
+      [
+        28.19,
+        -13.0
+      ],
+      [
+        28.25,
+        -13.5
+      ],
+      [
+        28.32,
+        -19.5
+      ],
+      [
+        28.84,
+        -19.5
+      ],
+      [
+        28.9,
+        -11.5
+      ],
+      [
+        29.293,
+        -13.5
+      ],
+      [
+        29.3,
+        -13.5
+      ],
+      [
+        29.693,
+        -13.0
+      ],
+      [
+        37.184,
+        -13.0
+      ],
+      [
+        43.314,
+        -13.0
+      ],
+      [
+        43.444,
+        -13.5
+      ],
+      [
+        43.7,
+        -12.0
+      ],
+      [
+        45.3,
+        -12.0
+      ],
+      [
+        45.9,
+        -70.0
+      ]
+    ]
+  },
+  "bgm": {
+    "file": "lofi-study_fassounds.mp3",
+    "path": "E:\\codex\\ans-brand-film-studio\\.agents\\skills\\mg-styles-15\\demos\\ans-brand-film\\assets\\lofi-study_fassounds.mp3",
+    "offset": 8.5,
+    "bed_rms_dbfs": -20.31,
+    "levels_rel_voice": {
+      "body": -13.0,
+      "gap": -13.5,
+      "dip": -19.5,
+      "act5": -13.0,
+      "endcard": -12.0
+    },
+    "enabled": true
+  },
+  "sfx_backend": "mgaudio click/pop/chime/riser",
+  "qa": {
+    "rms_05s_min": -32.66,
+    "rms_05s_min_at": 44.0,
+    "rms_05s_max": -9.58,
+    "rms_05s_max_at": 42.5,
+    "rms_1s_min": -30.69,
+    "rms_1s_min_at": 44.0,
+    "rms_1s_max": -10.43,
+    "rms_1s_max_at": 42.5,
+    "crest_mean": 14.61,
+    "crest_min": 9.06,
+    "crest_max": 17.87,
+    "accents": [
+      {
+        "nominal": 6.833,
+        "attack": 6.8383,
+        "error_ms": 5.25,
+        "error_frames": 0.13
+      },
+      {
+        "nominal": 14.76,
+        "attack": 14.7549,
+        "error_ms": -5.15,
+        "error_frames": -0.12
+      },
+      {
+        "nominal": 23.786,
+        "attack": 23.7966,
+        "error_ms": 10.56,
+        "error_frames": 0.25
+      },
+      {
+        "nominal": 28.85,
+        "attack": 28.8382,
+        "error_ms": -11.77,
+        "error_frames": -0.28
+      }
+    ],
+    "accent_max_frame_error": 0.28
+  },
+  "calibration": [
+    {
+      "pass": 1,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 0.0,
+      "ride_db": 6.0,
+      "body_rms_dbfs": -13.66,
+      "body_rms_excl_ride": -14.06,
+      "lufs": -14.0,
+      "lra": 4.1,
+      "tp": -0.9,
+      "tp_os": -1.056,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 2,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 0.86,
+      "ride_db": 7.53,
+      "body_rms_dbfs": -13.66,
+      "body_rms_excl_ride": -14.15,
+      "lufs": -14.0,
+      "lra": 4.7,
+      "tp": -0.9,
+      "tp_os": -1.064,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 3,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 1.68,
+      "ride_db": 8.52,
+      "body_rms_dbfs": -13.61,
+      "body_rms_excl_ride": -14.14,
+      "lufs": -14.0,
+      "lra": 5.0,
+      "tp": -0.9,
+      "tp_os": -1.051,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 4,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 9.24,
+      "body_rms_dbfs": -13.65,
+      "body_rms_excl_ride": -14.2,
+      "lufs": -14.0,
+      "lra": 5.2,
+      "tp": -0.9,
+      "tp_os": -1.056,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 5,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 9.78,
+      "body_rms_dbfs": -13.6,
+      "body_rms_excl_ride": -14.17,
+      "lufs": -14.0,
+      "lra": 5.2,
+      "tp": -0.9,
+      "tp_os": -1.055,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 6,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 10.32,
+      "body_rms_dbfs": -13.63,
+      "body_rms_excl_ride": -14.21,
+      "lufs": -14.0,
+      "lra": 5.3,
+      "tp": -0.9,
+      "tp_os": -1.055,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 7,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 10.77,
+      "body_rms_dbfs": -13.67,
+      "body_rms_excl_ride": -14.27,
+      "lufs": -14.0,
+      "lra": 5.5,
+      "tp": -0.9,
+      "tp_os": -1.056,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 8,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 11.04,
+      "body_rms_dbfs": -13.62,
+      "body_rms_excl_ride": -14.22,
+      "lufs": -14.0,
+      "lra": 5.4,
+      "tp": -0.9,
+      "tp_os": -1.055,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 9,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 11.4,
+      "body_rms_dbfs": -13.61,
+      "body_rms_excl_ride": -14.23,
+      "lufs": -14.0,
+      "lra": 5.5,
+      "tp": -0.9,
+      "tp_os": -1.055,
+      "mode": "trim+limiter"
+    },
+    {
+      "pass": 10,
+      "vo_gain_db": 0.98,
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 11.67,
+      "body_rms_dbfs": -13.62,
+      "body_rms_excl_ride": -14.25,
+      "lufs": -14.0,
+      "lra": 5.6,
+      "tp": -0.9,
+      "tp_os": -1.055,
+      "mode": "trim+limiter"
+    },
+    {
+      "kind": "selected",
+      "pad_db": -12.0,
+      "bed_offset_db": 2.0,
+      "ride_db": 10.77,
+      "score": 1.84,
+      "in_lra_band": true
+    }
+  ],
+  "mastering": {
+    "target_lufs": -14.0,
+    "target_tp": -1.0,
+    "measured_lufs": -14.0,
+    "measured_tp": -0.9,
+    "measured_tp_oversampled": -1.056,
+    "measured_lra": 5.5,
+    "method": "explicit gain trim + true-peak limiter (trim+limiter)",
+    "passes": [
+      {
+        "mode": "trim+limiter",
+        "i": -23.9,
+        "lra": 9.2,
+        "tp": -1.5,
+        "tp_os": -1.499,
+        "gain_db": 0.0,
+        "limiter": 1.0
+      },
+      {
+        "mode": "trim+limiter",
+        "i": -14.8,
+        "lra": 7.2,
+        "tp": -0.1,
+        "tp_os": -0.264,
+        "gain_db": 9.9,
+        "limiter": 1.0
+      },
+      {
+        "mode": "trim+limiter",
+        "i": -14.7,
+        "lra": 6.2,
+        "tp": -0.9,
+        "tp_os": -1.066,
+        "gain_db": 10.7,
+        "limiter": 1.0
+      },
+      {
+        "mode": "trim+limiter",
+        "i": -14.3,
+        "lra": 5.7,
+        "tp": -0.9,
+        "tp_os": -1.059,
+        "gain_db": 11.4,
+        "limiter": 1.0
+      },
+      {
+        "mode": "trim+limiter",
+        "i": -14.1,
+        "lra": 5.5,
+        "tp": -0.9,
+        "tp_os": -1.057,
+        "gain_db": 11.7,
+        "limiter": 1.0
+      },
+      {
+        "mode": "trim+limiter",
+        "i": -14.0,
+        "lra": 5.5,
+        "tp": -0.9,
+        "tp_os": -1.056,
+        "gain_db": 11.8,
+        "limiter": 1.0
+      }
+    ],
+    "true_peak_margin": 0.35,
+    "body_rms_dbfs": -13.67,
+    "body_rms_excl_ride_dbfs": -14.25,
+    "body_rms_target": -15.5,
+    "body_metric_note": "body_rms_dbfs includes the finale ride (it sits inside S5's span); body_rms_excl_ride_dbfs is the same figure without the ridden 2.8 s"
+  },
+  "tts_cache": "E:\\codex\\ans-brand-film-studio\\ClaudeAnimationBase\\audio\\tts_cache"
+};

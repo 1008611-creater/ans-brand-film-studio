@@ -4,9 +4,188 @@
 //   - creator(x, y, u, o) : "我" (White crew-neck T-shirt 白体恤, head flower cluster 头上一堆花, double-bridge hollow glasses)
 //   - dino(x, y, u, o)    : "小恐龙" (Ultra-Kawaii Marshmallow-Plush ANS Mascot #9BE0C5)
 (() => {
-  const WIPE_MINT = ['#68B896', '#9BE0C5'];
-  const WIPE_GOLD = ['#E8AA38', '#9BE0C5'];
-  const WIPE_ROSE = ['#E27A92', '#E8AA38'];
+  // 全片只有一种转场（遮罩式笔刷擦除，见 maskWipe）；旧的 brushWipe/iris/墨点/whip 语言已全部移除。
+
+  // ============================================================================
+  // TIMELINE — the ONE place to re-time the film against the real voice-over (±0.5s).
+  // SHOT_T0 + FILM_DUR drive the shot list, every shot's length, and (through SHOT_DUR)
+  // every action beat inside every shot. BEATS/SPAN hold those beats as FRACTIONS of the
+  // shot's own dur, so changing SHOT_T0 can never desync an action from its shot, and
+  // every dur-relative effect (brushWipe at dur-0.3, shot 5's iris at dur-0.55, the
+  // camera kf curves) stretches along with it. No shot-relative second is hard-coded.
+  //   beatAt(dur, .40) → "40% of the way into this shot", in seconds since its start.
+  // ============================================================================
+  const FILM_DUR = 45.9;                                    // must equal PROJECT.duration (src/config.js)
+  // s1..s5 就是口播五幕边界（锁定）；s6 是纯画面新增的落版段（end card），不占口播。
+  const SHOT_T0 = { s1: 0.0, s2: 7.027, s3: 14.760, s4: 23.786, s5: 29.143, s6: 43.70 };
+  const SHOT_DUR = {
+    s1: SHOT_T0.s2 - SHOT_T0.s1,                          //  7.027s 痛点暴击
+    s2: SHOT_T0.s3 - SHOT_T0.s2,                          //  7.733s 顶配模型
+    s3: SHOT_T0.s4 - SHOT_T0.s3,                          //  9.026s 一键成品
+    s4: SHOT_T0.s5 - SHOT_T0.s4,                          //  5.357s 算力福利
+    s5: SHOT_T0.s6 - SHOT_T0.s5,                          // 14.557s 28天 Flag：日历缓推+落章 / 插旗 / Full Reset
+    s6: FILM_DUR - SHOT_T0.s6                             //  2.200s 落版 end card（D8：加长到 2.2s）
+  };
+  // 缓动补件（core.js 只有 ease/easeOut/easeIn/backOut/elasticOut）
+  const easeOutCubic = x => 1 - Math.pow(1 - clamp(x), 3);
+  const easeInOutQuart = x => { x = clamp(x); return x < .5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2; };
+  const easeInOutQuint = x => { x = clamp(x); return x < .5 ? 16 * x * x * x * x * x : 1 - Math.pow(-2 * x + 2, 5) / 2; };
+  const beatAt = (dur, frac) => dur * frac;               // fraction of this shot → seconds since its start
+  // Act5 内部节拍改用「幕内绝对秒」：口播边界与落版段起点都是绝对时间，比例会随 dur 漂移，绝对秒不会。
+  const at5 = sec => sec - SHOT_T0.s5;                    // 绝对秒 → Act5 幕内秒
+  const T5 = {
+    push: at5(29.600),        // 0.457s  日历 20 帧 1.00→1.14 ease-out cubic 缓推起点
+    stampTop: at5(30.566),    // 1.423s  落章上抬顶点（其前 3 帧 = 上抬预备，起点 30.441s 紧接缓推到位）
+    stamp: at5(30.733),       // 1.590s  落章接触帧 —— hero moment（其后 4 帧 = 砸下，30.566→30.733）
+    pullBack: at5(31.350),    // 2.207s  拉回广角起点
+    pullBackEnd: at5(32.200), // 3.057s  回到广角
+    flagStart: at5(31.900),   // 2.757s  旗杆开始落下
+    plant: at5(33.000),       // 3.857s  插旗入地 + 金色爆发
+    reset: at5(38.500)        // 9.357s  FULL RESET 警示 + 双主角宣誓
+  };
+  const STAMP = { x: 184, y: 447, lift: 3 / 24, slam: 4 / 24, flash: 3 / 24, splat: 0.42 };
+  // WHEN a beat fires, as a fraction of that shot's own dur.
+  const BEATS = {
+    s1: { dinoIn: .10, sweep: .40, spark2: .74 },                                  // 入场 / 扫除吃灰 / 二次迸发
+    s2: { pull: .22, cheer: .72 },                                                 // 拉满血总闸 / 全员庆祝
+    s3: { kick: .06, kickEnd: .21, press: .26, cheer: .80 },                       // 踢线团 / 按按钮 / (卡片连出) / 验收庆祝
+    s4: { gift: .20, ticketIn: .03, cheer: .68 }                                   // 算力券飞入 / 券起 / 金币再撒一轮
+  };
+  // HOW LONG a beat's own action takes, also as a fraction of the same dur.
+  const SPAN = {
+    s2: { chamberStagger: .04, chamberLight: .12 },
+    s3: { cardFly: .05, cardGap: .035, cardSettle: .04, cheerBurst: .12 }
+  };
+  // ============================================================================
+  // 统一转场语言（全片唯一一种）：遮罩式笔刷擦除
+  //   笔刷宽 1400px、边缘噪声 ±24px、自左下 30° 扫过、单侧 10 帧 easeInOutQuart。
+  //   k=0 全露 → k=1 全遮；上一幕出 k:0→1、下一幕入 k:1→0，切点两侧连续。
+  //   遮罩带按帧移位的鬃毛划痕（f = 当前帧号），相邻帧永不重复（D11）。
+  // ============================================================================
+  const TX = { span: 10 / 24, ang: -30 * Math.PI / 180, half: 700, noise: 24 };
+  function maskWipe(k, seedKey) {
+    k = clamp(k);
+    if (k <= 0.002) return;
+    const f = Math.floor(T * 24);
+    boilSeed('mask_' + seedKey);
+    push();
+    translate(W / 2, H / 2);
+    rotate(TX.ang);
+    translate(-W / 2, -H / 2);
+    const X = lerp(-2400, 2400, easeInOutQuart(k));
+    const yTop = -900, yBot = H + 900, edge = [];
+    for (let y = yTop; y <= yBot; y += 120) {
+      const n = (hash(Math.floor(y / 120) * 7.3 + f * 0.37) - 0.5) * 2 * TX.noise
+        + Math.sin(y * 0.011 + f * 0.63) * TX.noise * 0.5;
+      edge.push([X + n, y]);
+    }
+    paint([[-2600, yTop]].concat(edge, [[-2600, yBot]]), {
+      wash: '#9BE0C5', washOp: 255, fill: '#68B896', fillOp: 70, bleed: 0.12, tex: 0.6, ink: null, curv: 0.35
+    });
+    for (let i = 0; i < 9; i++) {                       // 前缘鬃毛细舌：强化"刷过去"的方向感
+      const yy = yTop + ((i + 0.5) / 9) * (yBot - yTop) + (hash(i * 3.1 + f * 0.7) - 0.5) * 70;
+      paint(rectPts(X - 12, yy, 40 + hash(i * 5.7 + f * 0.31) * 130, 10 + hash(i + f * 0.19) * 18, 5),
+        { wash: '#9BE0C5', washOp: 235, ink: null });
+    }
+    pop();
+  }
+  // ============================================================================
+  // 片头（D10）：0–6 帧深墨线 #1E2A33 的 ANS 字标（纸底对比 ≈14:1）→ 6–14 帧薄荷笔刷自下而上
+  //   扫过留白 → 14–26 帧画面自右下角有机撕开，露出夜景第一幕。首次可辨识画面 = 第 0 帧。
+  // ============================================================================
+  const OPEN = { sweep0: 6 / 24, sweep1: 14 / 24, tear0: 14 / 24, tear1: 26 / 24 };
+  function openingCard(lt) {
+    if (lt >= OPEN.tear1) return;
+    flushLetters();                            // 先把本幕场景里的字落到底下，纸底才盖得住
+    const tearK = easeInOutQuint(seg(lt, OPEN.tear0, OPEN.tear1));
+    if (tearK < 0.999) {                       // 未撕开区域 = 纸底（有机边缘，右下角留洞）
+      const Cx = W + 240, Cy = H + 240, R = 200 + 2500 * tearK;
+      const s = Math.sqrt(Math.max(0, R * R - 240 * 240));
+      boilSeed('open_tear');
+      const poly = [[-340, -340], [W + 340, -340], [W + 340, Cy - s]];
+      for (let i = 0; i <= 14; i++) {
+        const a = -Math.PI / 2 + (i / 14) * Math.PI / 2;
+        const rr = R * (1 + 0.14 * Math.sin(i * 2.1 + 1.3));
+        poly.push([Cx + Math.cos(a) * rr, Cy + Math.sin(a) * rr]);
+      }
+      poly.push([Cx - s, H + 340], [-340, H + 340]);
+      paint(poly, { wash: '#FFFDF6', washOp: 255, fill: '#F2E5CE', fillOp: 45, bleed: 0.1, tex: 0.5, ink: null, curv: 0.3 });
+    }
+    const markA = 1 - seg(lt, OPEN.sweep0, OPEN.sweep0 + 0.10);
+    if (markA > 0.02) letter('ANS', 960, 470, 210, '#1E2A33', { screen: true, ink: false, alpha: markA, rot: -0.015 });
+    const swK = easeInOutQuart(seg(lt, OPEN.sweep0, OPEN.sweep1));
+    if (swK > 0 && swK < 1) {                  // 薄荷笔刷自下而上扫过，把纸面留白
+      const yc = lerp(H + 460, -460, swK), yBot = yc + 300, edge = [];
+      for (let x = -420; x <= W + 420; x += 130)
+        edge.push([x, yc - 300 + (hash(Math.floor(x / 130) * 3.7) - 0.5) * 46 + Math.sin(x * 0.008 + 2) * 16]);
+      boilSeed('open_sweep');
+      paint([[-420, yBot]].concat(edge, [[W + 420, yBot]]), {
+        wash: '#9BE0C5', washOp: 255, fill: '#68B896', fillOp: 60, bleed: 0.14, tex: 0.6, ink: null, curv: 0.4
+      });
+    }
+  }
+
+  // 幕尾/幕首统一调用：出 k 0→1、入 k 1→0（10 帧，两侧在切点连续）
+  const wipeOut = (lt, dur) => { if (lt > dur - TX.span) maskWipe((lt - (dur - TX.span)) / TX.span, 'out'); };
+  const wipeIn = lt => { if (lt < TX.span) maskWipe(1 - lt / TX.span, 'in'); };
+
+  // ============================================================================
+  // HUD（屏幕空间，画在 camEnd 之后 → 永远压住场景里的旗杆等元素，D3）
+  //   · 顶部横幅：6 帧自右 easeOutCubic 滑入 → 停 2 帧 → 收到 520×64 左上角标（0.9 不透明度）
+  //   · 底部字幕胶囊：逐句进 6 帧 easeOutCubic / 出 4 帧淡出；章节 chip 只在幕首 1.2s
+  // ============================================================================
+  const HUD = { bw: 1040, bh: 88, bx: 440, by: 48, sw: 520, sh: 64, sx: 64, sy: 48, inF: 6, holdF: 8, shrinkF: 16 };
+  function hudBrand(lt, topic) {
+    const inK = easeOutCubic(seg(lt, 0, HUD.inF / 24));
+    const bgK = easeOutCubic(seg(lt, HUD.holdF / 24, HUD.shrinkF / 24));
+    if (inK <= 0.01) return;
+    const bw = lerp(HUD.bw, HUD.sw, bgK), bh = lerp(HUD.bh, HUD.sh, bgK);
+    const bx = lerp(HUD.bx + 980 * (1 - inK), HUD.sx, bgK), by = lerp(HUD.by, HUD.sy, bgK);
+    const a = lerp(1, 0.9, bgK);
+    boilSeed('hud_brand');
+    paint(rrPts(bx, by, bw, bh, lerp(22, 16, bgK), 1.4), {
+      wash: '#2B2233', washOp: 250 * a, fill: PAL.indigo, fillOp: 90 * a, ink: PAL.ink, sw: 1.5 * a
+    });
+    const cx = bx + bw / 2, cy = by + bh / 2;
+    // 宽幅期只放 ≤9 字的幕标题 —— 禁止复述字幕句（上一轮盲审点名的"顶栏与字幕同句重复"）
+    const topicA = inK * (1 - seg(bgK, 0.25, 0.7));
+    if (topicA > 0.02) letter(topic, cx, cy, 30, DINO_COLS.mint, { alpha: topicA, ink: false });
+    // 角标期：品牌锁定 + URL。URL 只在横幅完全落位（inK=1，右端 1480）之后才出现，永不被画框裁切
+    const badgeA = seg(bgK, 0.55, 1) * seg(inK, 0.92, 1);
+    if (badgeA > 0.02) {
+      letter('ANS · AI Never Stops', HUD.sx + HUD.sw / 2, HUD.sy + 22, 24, DINO_COLS.mint, { alpha: badgeA, ink: false });
+      letter('ans.cauai.fun', HUD.sx + HUD.sw / 2, HUD.sy + 46, 16, DINO_COLS.mint, { alpha: badgeA * 0.85, ink: false });
+    }
+  }
+  // 文本限宽（复用 letter 的字体度量，超出加省略号；D7-②）
+  const _measCtx = document.createElement('canvas').getContext('2d');
+  function fitText(txt, size, maxW) {
+    _measCtx.font = 'bold ' + size + 'px "Permanent Marker", "ZCOOL KuaiLe", "PingFang SC", cursive, sans-serif';
+    if (_measCtx.measureText(txt).width <= maxW) return txt;
+    let s = txt;
+    while (s.length > 1 && _measCtx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+    return s + '…';
+  }
+  // D6 场景层缓解：角色外侧同类色湿边渗化（垫在角色之下，不碰角色几何/坐标）
+  function wetHalo(x, y, u, col) {
+    boilSeed('halo_' + col);                       // 稳定种子：不随位置逐帧重随机
+    paint(ellPts(x, y - 4.7 * u, 5.55 * u, 6.35 * u, 22, 2.6), {
+      wash: col, washOp: 26, fill: col, fillOp: 20, bleed: 0.62, tex: 0.8, border: 0.9, ink: null
+    });
+  }
+  // Dev guard: SHOT_T0/SHOT_DUR and the two film lengths must agree (change one, not three).
+  const shotSum = SHOT_DUR.s1 + SHOT_DUR.s2 + SHOT_DUR.s3 + SHOT_DUR.s4 + SHOT_DUR.s5 + SHOT_DUR.s6;
+  if (Math.abs(shotSum - FILM_DUR) > 1e-6 || Math.abs(DUR - FILM_DUR) > 1e-6)
+    console.warn('ans_day01: timeline mismatch — SHOT_T0 sums to ' + shotSum.toFixed(2) +
+      's, FILM_DUR is ' + FILM_DUR + 's, PROJECT.duration is ' + DUR + 's');
+
+  // 静态种子：给大面积水彩底纹用。它们不参与 boil —— 否则整片空旷区每 3 帧重抖一次，
+  // 在 1080p 1:1 下就是"背景乱闪"。线稿/道具仍走 boilSeed，手绘抖动保留。
+  const staticSeed = key => {
+    let h = 2166136261;
+    for (const c of key + '|static') h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    randomSeed(h >>> 0);
+  };
 
   // Sparkle burst helper
   function sparkle(x, y, r, k, col = PAL.cream) {
@@ -67,7 +246,8 @@
     inkLine(P, 1.1, PAL.ink, 'ink', 0.5);
     for (let i = 1; i < count; i++) {
       const [bx, by] = P[i];
-      const pulseA = 0.65 + 0.35 * Math.sin(t * 5 + i * 1.4);
+      // 锁在小节（4 拍 = 1.94s）上的慢呼吸。原来是 5 rad/s 自由振荡，在 1080p 下就是"全片乱闪"
+      const pulseA = 0.74 + 0.26 * Math.sin(TAU * bpOf(t) / 4 + i * 0.55);
       glow(bx, by + 12, 42, glowCol, 0.5 * pulseA);
       paint(ellPts(bx, by + 12, 9, 12, 10), {
         wash: i % 2 ? glowCol : DINO_COLS.mint, ink: PAL.ink, sw: 0.7
@@ -97,33 +277,146 @@
     });
   }
 
-  // Hand-painted comic subtitle ribbon at bottom of screen (screen space, flushed before transitions)
-  function storyRibbon(tag, lineText, lt, dur) {
-    boilSeed('ribbon_' + tag);
-    const popK = backOut(seg(lt, 0.08, 0.36));
-    const yC = 1004;
-    const rw = 1520, rh = 82;
-    push();
-    translate(W / 2, yC);
-    scale(0.92 + 0.08 * popK, popK);
-    paint(rrPts(-rw / 2, -rh / 2, rw, rh, 22, 1.8), {
-      wash: '#FFFDF6', washOp: 248, fill: '#F2E5CE', fillOp: 70, bleed: 0.08,
-      ink: PAL.ink, sw: 1.5
+  // ============================================================================
+  // 字幕（与口播逐字一致）—— 唯一权威来源 audio/day01_timeline.json
+  //   · text  = segments[].tts，一字不改、不概括、不加标点（句末标点沿用原文）
+  //   · 窗口  = segment.start .. start + voice_dur（= end − start），字幕只在这段里出现
+  //   · 子句  = 按 。！？ 与 —— 切分，条内位置用与 Python 侧同款 text_units() 字数权重分配
+  //            （音频侧给出 sub_clause_plan 后把 SUBS[].clauses 换成它即可，渲染代码不动）
+  // ============================================================================
+  function textUnits(s) {
+    let u = 0;
+    for (const ch of s) {
+      const c = ch.codePointAt(0);
+      if (c >= 0x4e00 && c <= 0x9fff) u += 1.0;
+      else if (c < 128 && /[0-9A-Za-z]/.test(ch)) u += 0.5;
+      else if ('。！？'.includes(ch)) u += 3.0;
+      else if ('，、；：'.includes(ch)) u += 1.6;
+      else u += 0.8;
+    }
+    return u;
+  }
+  function clausePlan(text, t0, dur) {
+    const parts = [];
+    for (const h of text.split(/(?<=[。！？])/)) {
+      if (!h.trim()) continue;
+      for (const s of h.split(/(?<=——)/)) if (s.trim()) parts.push(s);
+    }
+    const total = parts.reduce((a, p) => a + textUnits(p), 0);
+    let cum = 0;
+    return parts.map((p, i) => {
+      const st = t0 + dur * (cum / total);
+      cum += textUnits(p);
+      return { text: p, t0: st, dur: (i === parts.length - 1 ? t0 + dur : t0 + dur * (cum / total)) - st };
     });
-    paint(rrPts(-rw / 2 + 14, -rh / 2 + 12, 270, rh - 24, 15, 1.2), {
-      wash: DINO_COLS.mint, washOp: 255, fill: DINO_COLS.mintDk, fillOp: 65,
-      ink: PAL.ink, sw: 1.2
+  }
+  // plan = 音频侧 sub_clause_plan（source=silence，非插值），[起, 止, 文本]；文本与 segments[].tts 同源。
+  const SUBS = {
+    S1: { t0: 0.25, vdur: 6.327, ch: '第 01 幕', title: '痛点暴击',
+      text: '刷了那么多 AI，最后只剩下 99+ 的吃灰收藏夹和一堆聊天记录。别慌，ANS 来了。',
+      plan: [[0.250, 5.114, '刷了那么多 AI，最后只剩下 99+ 的吃灰收藏夹和一堆聊天记录。'],
+             [5.114, 6.577, '别慌，ANS 来了。']] },
+    S2: { t0: 7.477, vdur: 6.833, ch: '第 02 幕', title: '第一件 · 顶配模型',
+      text: '第一件，顶配旗舰模型一站直连。GPT-6-Astra、大肥鱼 v4.1、Opus 5.5，全部满血开跑。',
+      plan: [[7.477, 9.896, '第一件，顶配旗舰模型一站直连。'],
+             [9.896, 14.310, 'GPT-6-Astra、大肥鱼 v4.1、Opus 5.5，全部满血开跑。']] },
+    S3: { t0: 15.21, vdur: 8.126, ch: '第 03 幕', title: '第二件 · 一键成品',
+      text: '第二件，最快时间上手顶级 AI 项目。不用到处翻教程配环境。全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品。',
+      plan: [[15.210, 17.627, '第二件，最快时间上手顶级 AI 项目。'],
+             [17.627, 19.316, '不用到处翻教程配环境。'],
+             [19.316, 23.336, '全网最火的硬核 AI 玩法，进来就能用最快速度跑通，做出自己的成品。']] },
+    S4: { t0: 24.236, vdur: 4.457, ch: '第 04 幕', title: '第三件 · 算力福利',
+      text: '第三件，注册即送算力福利。进来就有免费额度，直接开造，不玩套路。',
+      plan: [[24.236, 26.180, '第三件，注册即送算力福利。'],
+             [26.180, 28.693, '进来就有免费额度，直接开造，不玩套路。']] },
+    S5: { t0: 29.593, vdur: 13.801, ch: '第 05 幕', title: '28 天 Flag',
+      text: '立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）。让改进开始吧。',
+      plan: [[29.593, 34.199, '立个 28 天的 Flag：接下来的 28 天里，每一天我们只做两件事中的一件——'],
+             [34.199, 42.416, '要么上线一项对大多数 ANS 用户都清晰有感、真正切中需求的改进，要么直接来一次全员额度重置（Full Reset 认罚发算力）。'],
+             [42.416, 43.394, '让改进开始吧。']] }
+  };
+  // 有权威 plan 就用它；将来某段缺 plan 时退回 clausePlan() 的字数权重推算。
+  for (const k in SUBS) {
+    const S = SUBS[k];
+    S.clauses0 = S.plan ? S.plan.map(([a, b, txt]) => ({ text: txt, t0: a, dur: b - a }))
+      : clausePlan(S.text, S.t0, S.vdur);
+  }
+  // 懒加载：字体测量要等字体加载完，故第一次绘制时才做宽度校验。
+  // 仍放不下的条按最近的逗号再切一刀，两半在原子句窗内按字数权重分窗（显示窗永远是原子句窗的子集）。
+  function clausesOf(subId) {
+    const S = SUBS[subId];
+    if (S.clauses) return S.clauses;
+    const out = [];
+    for (const c of S.clauses0) {
+      if (capSize(c.text, CAP.size, CAP.maxW) > CAP.minSize) { out.push(c); continue; }
+      const cuts = [];
+      for (let i = 0; i < c.text.length; i++) if ('，、；'.includes(c.text[i])) cuts.push(i + 1);
+      if (!cuts.length) { out.push(c); continue; }
+      const mid = c.text.length / 2;
+      const cut = cuts.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a, cuts[0]);
+      const a = c.text.slice(0, cut), b = c.text.slice(cut);
+      const ua = textUnits(a), ub = textUnits(b), tot = ua + ub;
+      out.push({ text: a, t0: c.t0, dur: c.dur * (ua / tot) });
+      out.push({ text: b, t0: c.t0 + c.dur * (ua / tot), dur: c.dur * (ub / tot) });
+    }
+    S.clauses = out;
+    return out;
+  }
+
+  // 底部字幕胶囊（屏幕空间，转场之前 flush）
+  //   · 整条窗口 = 该幕的段窗口；进 6 帧 easeOutCubic / 出 4 帧淡出
+  //   · 长句按子句逐条切换，条间 2 帧交叉淡化；字号按胶囊宽度自适应（24–34px）
+  //   · 左侧章节 chip 只在幕首 1.2s 出现，退场后胶囊收窄 264px
+  const CAP = { y: 1004, wChip: 1520, wNoChip: 1256, h: 82, chipW: 270, inF: 6, outF: 4, xf: 2,
+                chipHold: 1.2, chipOff: 0.22, size: 34, minSize: 22, maxW: 1216 };   // maxW = 无 chip 胶囊内宽
+  function capSize(txt, size, maxW) {
+    _measCtx.font = 'bold ' + size + 'px "Permanent Marker", "ZCOOL KuaiLe", "PingFang SC", cursive, sans-serif';
+    const w = _measCtx.measureText(txt).width;
+    return w <= maxW ? size : Math.max(CAP.minSize, Math.floor(size * maxW / w));
+  }
+  function storyRibbon(subId, t, lt, dur) {
+    const S = SUBS[subId];
+    const a = easeOutCubic(seg(t, S.t0, S.t0 + CAP.inF / 24))
+      * (1 - seg(t, S.t0 + S.vdur - CAP.outF / 24, S.t0 + S.vdur));
+    if (a <= 0.004) { flushLetters(); return; }          // 仍然清一次 letter 队列，避免字浮在转场之上
+    const CL = clausesOf(subId);
+    let ci = 0;                                          // 当前子句
+    while (ci + 1 < CL.length && t >= CL[ci + 1].t0) ci++;
+    // 子句切换 = 硬切 + 2 帧轻微上移/放大进场（alpha 从切换后第 1 帧就是 1.0）。
+    // 任意一帧只有一条字幕可见（重叠 0%）。不采用"P 淡出后再 C 淡入"的顺序淡变：
+    // 2 帧淡出在 24fps 采样下的最后一帧 alpha 恰为 0，而淡入首帧也是 0 → 交界处会留一个空帧；
+    // 硬切式进场既满足"绝不重叠"，也不会出现空帧或两行叠印。
+    const C = CL[ci], xf = CAP.xf / 24;
+    const enterK = ci === 0 ? 1 : easeOutCubic(seg(t, C.t0, C.t0 + xf));
+    const chipK = 1 - easeOutCubic(seg(lt, CAP.chipHold, CAP.chipHold + CAP.chipOff));
+    const rw = lerp(CAP.wNoChip, CAP.wChip, chipK), rh = CAP.h;
+    boilSeed('ribbon_' + subId);
+    push();
+    translate(W / 2, CAP.y);
+    scale(0.96 + 0.04 * a, a);
+    paint(rrPts(-rw / 2, -rh / 2, rw, rh, 22, 1.8), {
+      wash: '#FFFDF6', washOp: 246 * a, fill: '#F2E5CE', fillOp: 70 * a, bleed: 0.08,
+      ink: a > 0.02 ? PAL.ink : null, sw: 1.5 * a
+    });
+    if (chipK > 0.02) paint(rrPts(-CAP.wChip / 2 + 14, -rh / 2 + 12, CAP.chipW, rh - 24, 15, 1.2), {
+      wash: DINO_COLS.mint, washOp: 255 * chipK * a, fill: DINO_COLS.mintDk, fillOp: 65 * chipK * a,
+      ink: PAL.ink, sw: 1.2 * a
     });
     pop();
-    if (popK > 0.25) {
-      letter(tag, W / 2 - rw / 2 + 149, yC + 2, 29, PAL.ink, { screen: true, ink: false });
-      letter(lineText, W / 2 + 125, yC + 2, 34, PAL.ink, { screen: true, ink: false });
-    }
+    const tx = lerp(W / 2 + 12, W / 2 + 125, chipK);
+    // 章节 chip 只放"第 N 幕"，不复述幕标题、更不复述字幕句
+    letter(S.ch, W / 2 - CAP.wChip / 2 + 149, CAP.y + 2, 29, PAL.ink, { screen: true, ink: false, alpha: a * chipK });
+    // 正文带墨影：中文全角标点（U+FF0C 等）在小字号下墨迹偏细，加墨影后不再被读成半角。
+    // 只画当前这一条 —— 结构性保证"任意一帧都不可能出现两条字幕叠加"。
+    letter(C.text, tx, CAP.y + 2 + (1 - enterK) * 10, capSize(C.text, CAP.size, CAP.maxW) * (0.986 + 0.014 * enterK),
+      PAL.ink, { screen: true, alpha: a });
     flushLetters();
   }
 
   // ============================================================================
-  // SHOT 1 (0.0s – 3.0s): 痛点暴击 — "90% 的人每天都在刷 AI，最后只剩聊天记录和收藏夹吃灰"
+  // SHOT 1 (SHOT_T0.s1 → SHOT_T0.s2, 6.8s): 痛点暴击 — "90% 的人每天都在刷 AI，最后只剩聊天记录和收藏夹吃灰"
+  //   节拍① 0.68s 小恐龙入场 → 节拍② 2.72s 扫除吃灰 → 节拍③ 5.03s 二次灵感迸发，
+  //   节拍之间用上浮微粒 / 吊灯呼吸 / 窗外晨光 / 摄像缓移保持画面持续运动。
   // ============================================================================
   function drawDustyTower(baseX, baseY, side, t, blastK, idKey) {
     const n = 7;
@@ -149,11 +442,12 @@
       });
       pop();
       if (i === 2) {
-        const subTxt = side < 0 ? '📁 AI 教程收藏 (未看)' : '💬 历史对话 999+';
-        letter(subTxt, pos[0], pos[1], 20, PAL.ink, { rot, ink: false });
+        // 限宽 ≤ 底片宽−24px 并加省略（原文字溢出底片右端、被邻卡压住）
+        const subTxt = side < 0 ? '📁 AI 教程收藏（未看）' : '💬 历史对话 999+';
+        letter(fitText(subTxt, 20, w - 24), pos[0], pos[1], 20, PAL.ink, { rot, ink: false });
       }
       if (i === 6) {
-        const labelTxt = side < 0 ? '★ 99+ 收藏夹吃灰' : '一堆聊天记录吃灰';
+        const labelTxt = fitText(side < 0 ? '★ 99+ 收藏夹吃灰' : '一堆聊天记录吃灰', 26, 276);
         paint(rrPts(pos[0] - 150, pos[1] - 90, 300, 50, 12, 1.2), {
           wash: '#2B2233', ink: PAL.ink, sw: 1.2
         });
@@ -162,18 +456,27 @@
     }
   }
 
-  function shot1Bookmarks(t, lt, dur) {
-    const tSweep = 1.45;
-    const sweepK = seg(lt, tSweep, tSweep + 1.15);
-    const shake = lt > tSweep && lt < tSweep + 0.5 ? shakeXY(t, 9 * Math.exp(-(lt - tSweep) * 6)) : [0, 0];
+  function shot1Bookmarks(t, lt, dur) {            // dur = SHOT_DUR.s1 (7.027s)
+    const b = BEATS.s1;
+    const tIn = beatAt(dur, b.dinoIn);             // 0.68s 节拍①·小恐龙入场
+    const tSweep = beatAt(dur, b.sweep);           // 2.72s 节拍②·扫除吃灰
+    const tSpark2 = beatAt(dur, b.spark2);         // 5.03s 节拍③·二次灵感迸发
+    // 节拍之间的次级动效：吃灰碎屑化作灵感微粒持续上浮（纯 lt 驱动）
+    const motes = [];
+    for (let i = 0; i < 7; i++) {
+      const k = frac(lt / 3.4 + i / 7);
+      motes.push([300 + i * 232 + Math.sin(lt * 0.8 + i * 1.7) * 26, 860 - k * 520, Math.sin(k * Math.PI) * 0.7]);
+    }
+    const sweepK = seg(lt, tSweep, tSweep + beatAt(dur, .18));
+    const shake = lt > tSweep && lt < tSweep + beatAt(dur, .08) ? shakeXY(t, 9 * Math.exp(-(lt - tSweep) * 6)) : [0, 0];
     camBegin(
       960 + shake[0] + 12 * Math.sin(lt * 0.9),
-      kf(lt, [[0, 540], [tSweep, 525], [dur, 535]]) + shake[1],
-      kf(lt, [[0, 1.0], [tSweep, 1.04], [dur, 1.01]])
+      kf(lt, [[0, 540], [tIn, 532], [tSweep, 522], [tSpark2, 512], [dur, 506]]) + shake[1],
+      kf(lt, [[0, 1.0], [tSweep, 1.04], [tSpark2, 1.05], [dur, 1.05]])
     );
 
     // Rich Twilight Study Room Background
-    boilSeed('shot1_wall');
+    staticSeed('shot1_wall');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#282538', ink: null });
     paint(ellPts(W * 0.5, H * 0.42, W * 0.68, H * 0.44, 28, 12), {
       fill: '#3D3758', fillOp: 115, bleed: 0.28, tex: 0.6, ink: null
@@ -216,7 +519,8 @@
     boilSeed('shot1_lamp');
     inkLine([[960, -40], [960, 175]], 1.2, PAL.ink, 'ink', 0);
     paint([[925, 195], [995, 195], [975, 168], [945, 168]], { wash: '#3B4254', ink: PAL.ink, sw: 1.1 });
-    glow(960, 215, 180 + 260 * sweepK, '#FFE082', 0.65 + 0.3 * sweepK);
+    glow(960, 215, 180 + 260 * sweepK + 14 * Math.sin(TAU * bpOf(t) / 4), '#FFE082',
+      (0.65 + 0.3 * sweepK) * (0.92 + 0.08 * Math.sin(TAU * bpOf(t) / 4)));   // 锁小节（4 拍）
     paint(ellPts(960, 206, 16, 18, 12), { wash: '#FFE885', ink: PAL.ink, sw: 0.9 });
 
     // Floor, Rug & Potted Plants
@@ -228,12 +532,25 @@
       glow(930, 590, 360 + 520 * easeOut(sweepK), DINO_COLS.mint, 0.85 * sweepK);
     }
 
-    // Top floating context sign
-    boilSeed('shot1_top');
-    paint(rrPts(520, 48, 880, 72, 18, 1.8), {
-      wash: '#36304A', washOp: 248, fill: PAL.indigo, fillOp: 90, ink: PAL.ink, sw: 1.4
-    });
-    letter('🟢 Day 01 / 28 · ANS (AI Never Stops) 正式上线', 960, 84, 32, DINO_COLS.mint);
+    // ── 星形粒子层：统一画在道具与角色之下（星点不再压在小恐龙肚皮/道具上）──────────
+    const burst2 = seg(lt, tSpark2, tSpark2 + beatAt(dur, .16));
+    if (sweepK > 0) {
+      for (let i = 0; i < 9; i++) {
+        const ang = -Math.PI * 0.85 + (i / 8) * Math.PI * 0.7;
+        const dist = 150 + 340 * sweepK;
+        sparkle(900 + Math.cos(ang) * dist, 600 + Math.sin(ang) * dist * 0.6, 26, sweepK * 0.8, DINO_COLS.mint);
+      }
+    }
+    if (burst2 > 0 && burst2 < 1) {
+      for (let i = 0; i < 7; i++) {
+        const a2 = -Math.PI * 0.95 + (i / 6) * Math.PI * 0.9;
+        sparkle(900 + Math.cos(a2) * (170 + 320 * burst2), 610 + Math.sin(a2) * (200 + 190 * burst2), 22, burst2, PAL.cream);
+      }
+    }
+    const beatK = 0.40 + 0.60 * pulseF(t);                // 拍点提亮（帧对齐）：第 1 幕也有可对照的拍点闪烁
+    for (const [mx, my, mk] of motes) sparkle(mx, my, 13, mk * beatK, DINO_COLS.mint);
+
+    // 顶部品牌横幅已移至屏幕空间 HUD（hudBrand），不再画在摄像机里 → 旗杆等场景元素永远压不住它
 
     // Left and right dusty bookmark towers
     drawDustyTower(430, 855, -1, lt, sweepK, 'L');
@@ -242,27 +559,36 @@
     // Creator ("我") in center: sleepy/buried → startled take → bright idea!
     const myMood = emotions(lt, [
       [0, 'sleepy', { emote: 'cloud' }],
-      [0.7, 'dizzy'],
+      [beatAt(dur, .10), 'dizzy'],
       [tSweep, 'surprised', { lookX: -0.7 }],
-      [tSweep + 0.25, 'idea']
+      [tSweep + beatAt(dur, .04), 'idea'],
+      [tSpark2, 'excited'],
+      [tSpark2 + beatAt(dur, .07), 'starstruck']
     ]);
+    wetHalo(1060, 855, 25, '#EFC3AE');
     creator(1060, 855, 25, myMood);
 
     // ANS Little Dino ("小恐龙") leaps in from left with a glowing mint paintbrush-broom!
-    const dinoEnter = easeOut(seg(lt, 0.65, tSweep));
+    const dinoEnter = easeOut(seg(lt, tIn, tSweep));
     const dinoX = lerp(240, 755, dinoEnter);
-    const dinoHop = jump(lt, 0.85, tSweep + 0.15, 2.6);
+    const dinoHop = jump(lt, tIn + beatAt(dur, .025), tSweep + beatAt(dur, .02), 2.6);
+    const dinoHop2 = jump(lt, tSpark2, tSpark2 + beatAt(dur, .07), 1.9);      // 节拍③·再蹦一次
     const dinoMood = emotions(lt, [
       [0, 'determined'],
-      [tSweep - 0.1, 'excited'],
-      [tSweep + 0.7, 'happy']
+      [tSweep - beatAt(dur, .015), 'excited'],
+      [tSweep + beatAt(dur, .10), 'happy'],
+      [tSpark2, 'starstruck'],
+      [tSpark2 + beatAt(dur, .06), 'excited']
     ]);
+    wetHalo(dinoX, 855, 24, DINO_COLS.mint);
     dino(dinoX, 855, 24, {
       ...dinoMood,
-      view: lt < tSweep + 0.25 ? 'q' : 'front',
-      dy: (dinoMood.dy || 0) + dinoHop.dy,
-      sq: (dinoMood.sq || 0) + dinoHop.sq,
-      aR: lt > tSweep - 0.1 && lt < tSweep + 0.55 ? 0.9 + 0.45 * Math.sin((lt - tSweep) * 14) : 0.7,
+      view: lt < tSweep + beatAt(dur, .04) ? 'q' : 'front',
+      dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy,
+      sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq,
+      aR: lt > tSweep - beatAt(dur, .015) && lt < tSweep + beatAt(dur, .08) ? 0.9 + 0.45 * Math.sin((lt - tSweep) * 14)
+        : lt > tSpark2 - beatAt(dur, .02) && lt < tSpark2 + beatAt(dur, .10) ? 0.95 + 0.5 * Math.sin((lt - tSpark2) * 12)
+        : 0.7,
       armR: (u, sw) => {
         boilSeed('dino_broom');
         paint(rectPts(0, -0.22 * u, 2.8 * u, 0.44 * u, 0.8), { wash: PAL.ochre, ink: PAL.ink, sw: sw * 0.8 });
@@ -272,27 +598,21 @@
       }
     });
 
-    if (sweepK > 0) {
-      for (let i = 0; i < 9; i++) {
-        const ang = -Math.PI * 0.85 + (i / 8) * Math.PI * 0.7;
-        const dist = 150 + 340 * sweepK;
-        sparkle(900 + Math.cos(ang) * dist, 600 + Math.sin(ang) * dist * 0.6, 26, sweepK * 0.8, DINO_COLS.mint);
-      }
-      sfx('✨ 告别收藏夹吃灰 → ans.cauai.fun', 960, 165, 36, DINO_COLS.mint, lt - tSweep, { life: 1.5, rot: -0.02 });
-    }
+    if (sweepK > 0) sfx('✨ 告别收藏夹吃灰 → ans.cauai.fun', 960, 165, 36, DINO_COLS.mint, lt - tSweep, { life: 1.5, rot: -0.02 });
+    if (burst2 > 0 && burst2 < 1) sfx('💡 灵感来了 · 现在就开造', 960, 168, 34, PAL.ochre, lt - tSpark2, { life: 1.6, rot: 0.02 });
 
-    const eyeScreen = toScreen(1060, 855 - 8 * 25);
     camEnd();
 
-    storyRibbon('痛点暴击', '90% 的人每天刷 AI，最后手里只剩聊天记录和收藏夹吃灰', lt, dur);
-
-    if (lt < 0.45) iris(...eyeScreen, lerp(0, 1600, easeIn(lt / 0.45)));
-    boilSeed('trans_1');
-    if (lt > dur - 0.3) brushWipe((lt - (dur - 0.3)) / 0.6, WIPE_MINT);
+    openingCard(lt);                                    // D10 片头：深墨字标 → 薄荷扫过 → 右下角撕开
+    hudBrand(lt, SUBS.S1.title);
+    storyRibbon('S1', t, lt, dur);
+    wipeOut(lt, dur);                                   // 统一转场：遮罩式笔刷擦除
   }
 
   // ============================================================================
-  // SHOT 2 (3.0s – 6.0s): 第一件事 — "顶配模型直接爽玩：GPT-6-Astra · 大肥鱼 v4.1 · Opus 5.5"
+  // SHOT 2 (SHOT_T0.s2 → SHOT_T0.s3, 5.6s): 第一件事 — "顶配模型直接爽玩：GPT-6-Astra · 大肥鱼 v4.1 · Opus 5.5"
+  //   节拍① 1.23s 拉下 MAX 满血总闸（三舱错峰点亮）→ 节拍② 4.03s 全员欢呼，
+  //   节拍之间电缆电流持续流动 + 三舱能量脉冲星点 + 培养舱核心自转。
   // ============================================================================
   function drawFlagshipChamber(cx, cy, title, badge, accentCol, activeK, idx, t) {
     boilSeed('chamber_' + idx);
@@ -301,7 +621,8 @@
     const y0 = cy - h + bounce;
 
     if (activeK > 0.05) {
-      glow(cx, cy - h * 0.55, 220 * activeK, accentCol, 0.85 * activeK);
+      glow(cx, cy - h * 0.55, 220 * activeK + 12 * Math.sin(t * 3 + idx), accentCol,
+        0.85 * activeK * (0.85 + 0.15 * Math.sin(t * 2.6 + idx)));
     }
 
     paint(rrPts(cx - w / 2, y0, w, h, 34, 2.0), {
@@ -319,7 +640,7 @@
       wash: activeK > 0.2 ? accentCol : '#8A8E9E', ink: PAL.ink, sw: 1.0
     });
 
-    const coreR = (50 + 12 * activeK) * (1 + 0.06 * Math.sin(t * 10 + idx));
+    const coreR = (50 + 12 * activeK) * (1 + 0.06 * Math.sin(TAU * bpOf(t) / 2 + idx));   // 锁 2 拍，原 t*10 自由振荡
     paint(starPts(cx, y0 + 112, coreR, 0.45, 5, t * (activeK > 0.2 ? 2.5 : 0.3)), {
       wash: activeK > 0.2 ? PAL.cream : '#B8B0A0',
       fill: accentCol, fillOp: 130 * activeK, ink: PAL.ink, sw: 1.2
@@ -348,17 +669,19 @@
     }
   }
 
-  function shot2Models(t, lt, dur) {
-    const tPull = 0.7;
-    const shake = lt > tPull && lt < tPull + 0.5 ? shakeXY(t, 7 * Math.exp(-(lt - tPull) * 6)) : [0, 0];
+  function shot2Models(t, lt, dur) {              // dur = SHOT_DUR.s2 (7.733s)
+    const b = BEATS.s2, sp = SPAN.s2;
+    const tPull = beatAt(dur, b.pull);             // 1.23s 节拍①·拉下 MAX 满血总闸
+    const tCheer = beatAt(dur, b.cheer);           // 4.03s 节拍②·全员欢呼
+    const shake = lt > tPull && lt < tPull + beatAt(dur, .09) ? shakeXY(t, 7 * Math.exp(-(lt - tPull) * 6)) : [0, 0];
     camBegin(
       960 + shake[0] + 12 * Math.sin(lt * 0.7),
-      kf(lt, [[0, 535], [tPull, 520], [dur, 530]]) + shake[1],
-      kf(lt, [[0, 0.98], [tPull + 0.3, 1.02], [dur, 1.0]])
+      kf(lt, [[0, 535], [tPull, 520], [tCheer, 512], [dur, 506]]) + shake[1],
+      kf(lt, [[0, 1.00], [tPull + beatAt(dur, .05), 1.02], [tCheer, 1.045], [dur, 1.06]])   // 1.00→1.06 缓推
     );
 
     // Rich Inventor Workshop Environment
-    boilSeed('shot2_bg');
+    staticSeed('shot2_bg');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#F6EFE0', ink: null });
     // Soft architectural wainscot wall & skylight clouds
     paint(ellPts(W * 0.5, 220, 820, 210, 28, 10), {
@@ -382,25 +705,47 @@
     inkLine([[960, 840], [960, 575]], 2.2, '#2B2233', 'ink', 0.3);
     inkLine([[960, 840], [1280, 740], [1500, 575]], 2.2, '#2B2233', 'ink', 0.5);
 
-    // Top workshop header sign
-    boilSeed('shot2_header');
-    paint(rrPts(520, 44, 880, 70, 18, 1.5), {
-      wash: '#2B2233', washOp: 248, ink: PAL.ink, sw: 1.3
-    });
-    letter('第一件：顶配旗舰模型 · 一站满血直连爽玩', 960, 79, 32, DINO_COLS.mint);
+    // 顶部横幅 → 屏幕空间 HUD
 
     // Three Flagship Model Chambers
-    const k1 = seg(lt, tPull, tPull + 0.65);
-    const k2 = seg(lt, tPull + 0.22, tPull + 0.85);
-    const k3 = seg(lt, tPull + 0.44, tPull + 1.05);
+    const cStagger = beatAt(dur, sp.chamberStagger), cLight = beatAt(dur, sp.chamberLight);
+    const k1 = seg(lt, tPull, tPull + cLight);
+    const k2 = seg(lt, tPull + cStagger, tPull + cStagger + cLight);
+    const k3 = seg(lt, tPull + 2 * cStagger, tPull + 2 * cStagger + cLight);
+    // ── 星形粒子层：画在培养舱之下（星点不再压在舱体上）──────────────────────
+    if (lt > tPull + cLight) {
+      const acc = ['#56B4E9', '#E8AA38', '#E27A92'];
+      for (let i = 0; i < 3; i++) {
+        const pk = pulseF(t);                                     // 帧对齐拍点：同拍同闪，非拍点不闪
+        const age = 0.28 + 0.72 * (1 - pk);                       // 拍点那一帧最亮最新，随后 3 帧老化消失
+        sparkle(420 + i * 540 + (hash(i * 7) - 0.5) * 40, 470 + (hash(i * 13) - 0.5) * 30, 24, age, acc[i]);
+      }
+    }
+
     drawFlagshipChamber(420, 575, 'GPT-6-Astra', '旗舰推理王', '#56B4E9', k1, 0, t);
     drawFlagshipChamber(960, 575, '大肥鱼 v4.1-1017', '中文与创意王', '#E8AA38', k2, 1, t);
     drawFlagshipChamber(1500, 575, 'Opus 5.5', '全栈工程王', '#E27A92', k3, 2, t);
 
+    // 次级动效：总闸拉下后电流沿三根电缆持续流动。端点用 sin 淡入淡出 ——
+    // 电缆起点 (960,840) 紧邻 MAX 总闸，端点残留会变成"拉杆旁的游离青点"，故 q→0 时不可见。
+    const flowA = seg(lt, tPull, tPull + beatAt(dur, .15));
+    if (flowA > 0) {
+      const cables = [[[960, 840], [640, 740], [420, 575]], [[960, 840], [960, 575]], [[960, 840], [1280, 740], [1500, 575]]];
+      for (let i = 0; i < 3; i++) {
+        const P = cables[i], fk = frac(t * 0.5 + i / 3) * (P.length - 1);
+        const si = Math.min(P.length - 2, Math.floor(fk)), uk = fk - si;
+        const q = Math.sin(Math.PI * fk);
+        if (q <= 0.03) continue;
+        const dx2 = lerp(P[si][0], P[si + 1][0], uk), dy2 = lerp(P[si][1], P[si + 1][1], uk);
+        glow(dx2, dy2, 46 * q, DINO_COLS.mint, 0.7 * flowA * q);
+        paint(ellPts(dx2, dy2, 7 * q, 7 * q, 10), { wash: DINO_COLS.mint, ink: null });
+      }
+    }
+
     // Foreground Master Power Switch
     boilSeed('master_switch');
     const swX = 960, swY = 865;
-    const leverAng = lerp(-0.55, 0.55, backOut(seg(lt, tPull - 0.15, tPull + 0.25)));
+    const leverAng = lerp(-0.55, 0.55, backOut(seg(lt, tPull - beatAt(dur, .025), tPull + beatAt(dur, .045))));
     push();
     translate(swX, swY - 25);
     rotate(leverAng);
@@ -413,45 +758,56 @@
     letter('MAX 满血总闸', swX, swY - 20, 22, PAL.ink, { ink: false });
 
     // Creator ("我") on left-center pulling the lever & cheering
-    const myHop = jump(lt, tPull - 0.15, tPull + 0.35, 2.0);
+    const myHop = jump(lt, tPull - beatAt(dur, .025), tPull + beatAt(dur, .06), 2.0);
+    const myHop2 = jump(lt, tCheer, tCheer + beatAt(dur, .07), 1.8);          // 节拍②·再欢呼一次
     const myMood = emotions(lt, [
       [0, 'determined'],
-      [tPull + 0.1, 'excited'],
-      [tPull + 1.1, 'happy']
+      [tPull + beatAt(dur, .02), 'excited'],
+      [tPull + beatAt(dur, .20), 'happy'],
+      [tCheer, 'starstruck'],
+      [tCheer + beatAt(dur, .07), 'excited']
     ]);
+    wetHalo(670, 868, 22, '#EFC3AE');
     creator(670, 868, 22, {
       ...myMood,
-      dy: (myMood.dy || 0) + myHop.dy,
-      sq: (myMood.sq || 0) + myHop.sq,
-      aR: lt > tPull ? 1.3 : 0.8
+      dy: (myMood.dy || 0) + myHop.dy + myHop2.dy,
+      sq: (myMood.sq || 0) + myHop.sq + myHop2.sq,
+      aL: lt > tCheer ? 1.3 + 0.4 * Math.sin(t * 7) : lt > tPull ? 1.3 : 0.8,   // 双臂镜像同姿
+      aR: lt > tCheer ? 1.3 + 0.4 * Math.sin(t * 7) : lt > tPull ? 1.3 : 0.8
     });
 
     // Little Dino ("小恐龙") on right-center cheering with starstruck eyes!
-    const dinoHop = jump(lt, tPull, tPull + 0.5, 2.4);
+    const dinoHop = jump(lt, tPull, tPull + beatAt(dur, .09), 2.4);
+    const dinoHop2 = jump(lt, tCheer, tCheer + beatAt(dur, .07), 2.0);        // 节拍②·再蹦一次
     const dinoMood = emotions(lt, [
       [0, 'happy'],
-      [tPull + 0.15, 'starstruck'],
-      [tPull + 1.2, 'excited']
+      [tPull + beatAt(dur, .03), 'starstruck'],
+      [tPull + beatAt(dur, .21), 'excited'],
+      [tCheer, 'love'],
+      [tCheer + beatAt(dur, .08), 'starstruck']
     ]);
+    wetHalo(1250, 868, 22, DINO_COLS.mint);
     dino(1250, 868, 22, {
       ...dinoMood,
       flip: true,
-      dy: (dinoMood.dy || 0) + dinoHop.dy,
-      sq: (dinoMood.sq || 0) + dinoHop.sq
+      dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy,
+      sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq
     });
 
     camEnd();
-    storyRibbon('01 · 顶配模型', '一站体验满血 GPT-6-Astra、大肥鱼 v4.1-1017、Opus 5.5 旗舰模型', lt, dur);
-
-    boilSeed('trans_2');
-    if (lt < 0.3) brushWipe(0.5 + lt / 0.6, WIPE_MINT);
-    if (lt > dur - 0.3) brushWipe((lt - (dur - 0.3)) / 0.6, WIPE_GOLD);
+    flushLetters();                                     // 场景字先落定，再盖入场遮罩
+    wipeIn(lt);                                         // 统一转场：上一幕的擦除在本幕头 10 帧收走
+    hudBrand(lt, SUBS.S2.title);
+    storyRibbon('S2', t, lt, dur);
+    wipeOut(lt, dur);
   }
 
   // ============================================================================
-  // SHOT 3 (6.0s – 9.0s): 第二件事 — "最快时间上手顶级 AI 项目，免翻教程配环境，直接出成品"
+  // SHOT 3 (SHOT_T0.s3 → SHOT_T0.s4, 12.4s): 第二件事 — "最快时间上手顶级 AI 项目，免翻教程配环境，直接出成品"
+  //   长幕 4 节拍：① 0.74s 踢飞 ✗配环境线团 → ② 3.22s 按下「ANS 一键跑通」→ ③ 3.53s 起三张成品卡依次出膛
+  //   → ④ 9.92s 成品验收庆祝；节拍之间卡片持续轻浮、出料口余温火花、能量脉冲、摄像缓推。
   // ============================================================================
-  function drawProjectCard(x, y, title, sub, col, popK, rot) {
+  function drawProjectCard(x, y, title, sub, col, popK, rot, t = 0) {
     if (popK <= 0.02) return;
     boilSeed('proj_' + title);
     const s = backOut(popK);
@@ -459,7 +815,7 @@
     translate(x, y);
     rotate(rot);
     scale(s);
-    glow(0, 0, 140, col, 0.55 * popK);
+    glow(0, 0, 140 + 16 * Math.sin(t * 2.4), col, 0.55 * popK * (0.9 + 0.1 * Math.sin(t * 3.1)));
     paint(rrPts(-160, -105, 320, 210, 20, 1.8), {
       wash: '#FFFDF7', washOp: 252, fill: col, fillOp: 55, bleed: 0.12,
       ink: PAL.ink, sw: 1.5
@@ -474,31 +830,40 @@
       wash: '#2B2233', ink: PAL.ink, sw: 0.9
     });
     pop();
-    if (popK > 0.3) {
-      letter(title, x, y - 66, 26, PAL.ink, { rot, ink: false });
-      letter(sub, x + 42, y + 18, 24, DINO_COLS.mint, { rot });
-      letter('✓ 成品已生成', x, y + 72, 22, PAL.sap, { rot, ink: false });
+    // 文字与卡体同一帧出现、同一 pop 曲线放大：卡体成形时文字必在场（不再有空白粉条/黑标签）
+    if (popK > 0.02) {
+      letter(title, x, y - 66, 26, PAL.ink, { rot, ink: false, pop: popK });
+      letter(sub, x + 42, y + 18, 24, DINO_COLS.mint, { rot, pop: popK });
+      letter('✓ 成品已生成', x, y + 72, 22, PAL.sap, { rot, ink: false, pop: popK });
     }
   }
 
-  function shot3Projects(t, lt, dur) {
-    const tPress = 0.65;
-    const shake = lt > tPress && lt < tPress + 0.4 ? shakeXY(t, 7 * Math.exp(-(lt - tPress) * 6)) : [0, 0];
+  function shot3Projects(t, lt, dur) {           // dur = SHOT_DUR.s3 (9.026s)
+    const b = BEATS.s3, sp = SPAN.s3;
+    const tKick = beatAt(dur, b.kick), tKickEnd = beatAt(dur, b.kickEnd);   // 0.74→2.60s 节拍①·踢飞报错线团
+    const tPress = beatAt(dur, b.press);                                   // 3.22s 节拍②·按下 ANS 一键跑通
+    const cardFly = beatAt(dur, sp.cardFly), cardGap = beatAt(dur, sp.cardGap);
+    const card0 = tPress + beatAt(dur, .025);                              // 3.53s 节拍③·第一张成品卡出膛
+    const tCard3 = card0 + 2 * cardGap + cardFly;                          // 5.01s 三张全部落位
+    const tCheer = beatAt(dur, b.cheer);                                   // 9.92s 节拍④·成品验收庆祝
+    const shake = lt > tPress && lt < tPress + beatAt(dur, .03) ? shakeXY(t, 7 * Math.exp(-(lt - tPress) * 6)) : [0, 0];
+    const bgDx = 38 * ease(seg(lt, beatAt(dur, .08), beatAt(dur, .92)));      // 背景层 2% 水平视差漂移
     camBegin(
       960 + shake[0] + 12 * Math.sin(lt * 0.75),
-      535 + shake[1],
-      kf(lt, [[0, 1.0], [tPress + 0.2, 1.03], [dur, 1.0]])
+      kf(lt, [[0, 535], [tKick, 530], [tPress, 524], [tCard3, 508], [tCheer, 502], [dur, 512]]) + shake[1],
+      kf(lt, [[0, 1.06], [tPress + beatAt(dur, .02), 1.07], [tCheer, 1.05], [dur, 1.06]])
     );
+    push(); translate(bgDx, 0);                                               // 背景层（墙/窗/洞洞板）独立视差
 
     // Rich Sunlit Art Studio with Panoramic Window & Pegboard Wall
-    boilSeed('shot3_bg');
+    staticSeed('shot3_bg');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#F5EDE0', ink: null });
     // Arched studio window on left-center showing blue sky & green hills outside
     paint(rrPts(420, 155, 380, 340, 40, 1.5), {
       wash: '#B8E3F8', fill: PAL.sky, fillOp: 90, ink: PAL.ink, sw: 1.5
     });
     paint(ellPts(610, 495, 210, 95, 22, 1.5), { wash: '#78B86A', ink: PAL.ink, sw: 1.0 });
-    paintCloud(540, 240, 75, 28, '#FFFFFF', 's3w');
+    paintCloud(540 + Math.sin(t * 0.32) * 30, 240 + Math.sin(t * 0.21) * 8, 75, 28, '#FFFFFF', 's3w');
     inkLine([[610, 160], [610, 490]], 1.4, PAL.ink, 'ink', 0);
     inkLine([[425, 325], [795, 325]], 1.4, PAL.ink, 'ink', 0);
 
@@ -513,20 +878,17 @@
       }
     }
 
+    pop();                                                                    // 背景层视差结束（地面/前景不动）
+
     paintFloorAndRug(865, '#D8C5A8', '#B89F7D', '#E8AA38', '#E27A92', 's3');
     paintStringLights(90, 50, 10, t, '#9BE0C5', 's3');
     paintPlant(1790, 865, 1.15, t, 's3R');
 
-    // Top banner
-    boilSeed('shot3_header');
-    paint(rrPts(490, 44, 940, 70, 18, 1.5), {
-      wash: '#2B2233', washOp: 248, ink: PAL.ink, sw: 1.3
-    });
-    letter('第二件：免翻教程配环境 · 全网最火 AI 玩法最快跑出成品', 960, 79, 30, PAL.ochre);
+    // 顶部横幅 → 屏幕空间 HUD
 
     // Left: Tangled "✗ 配环境报错" wire monster kicked into the left corner!
     boilSeed('wire_monster');
-    const kickK = easeOut(seg(lt, 0.3, 1.1));
+    const kickK = easeOut(seg(lt, tKick, tKickEnd));
     const wx = lerp(310, 175, kickK), wy = lerp(680, 470, kickK) - 70 * Math.sin(kickK * Math.PI);
     push();
     translate(wx, wy);
@@ -542,11 +904,19 @@
       wash: '#2B2233', ink: PAL.ink, sw: 1.1
     });
     letter('✗ 免翻教程配环境', wx, wy - 112, 23, '#FF6B6B');
+    // 节拍①的次级动效：踢飞瞬间扬起的灰尘碎屑
+    const dustK = seg(lt, tKick + beatAt(dur, .03), tKick + beatAt(dur, .17));
+    if (dustK > 0 && dustK < 1) {
+      for (let i = 0; i < 6; i++) {
+        const a2 = -Math.PI * 0.15 - (i / 5) * Math.PI * 0.7;
+        sparkle(wx + Math.cos(a2) * (60 + 190 * dustK), wy + 40 + Math.sin(a2) * (40 + 90 * dustK), 18, dustK, '#C9BFA8');
+      }
+    }
 
     // Center: Hand-painted "ANS 一键造物机"
     boilSeed('maker_machine');
     const mX = 790, mY = 865;
-    const mSq = spring(lt, tPress, 6, 18) * 0.14;
+    const mSq = spring(lt, tPress, 6, 18) * 0.14 + 0.012 * Math.sin(t * 1.7);   // 含待机呼吸（次级动效）
     push();
     translate(mX, mY);
     scale(1 + mSq, 1 - mSq);
@@ -557,7 +927,7 @@
     paint(rrPts(-125, -205, 250, 115, 16, 1.2), {
       wash: '#2B2233', ink: PAL.ink, sw: 1.3
     });
-    const btnDrop = lt > tPress ? 22 * easeOut(seg(lt, tPress, tPress + 0.15)) * (1 - 0.5 * seg(lt, tPress + 0.2, tPress + 0.6)) : 0;
+    const btnDrop = lt > tPress ? 22 * easeOut(seg(lt, tPress, tPress + beatAt(dur, .012))) * (1 - 0.5 * seg(lt, tPress + beatAt(dur, .016), tPress + beatAt(dur, .05))) : 0;
     paint(rectPts(-35, -285 + btnDrop, 70, 40, 1.0), { wash: '#3B4254', ink: PAL.ink, sw: 1.2 });
     paint(ellPts(0, -295 + btnDrop, 72, 28, 20), {
       wash: '#E23E36', fill: PAL.ochre, fillOp: 85, ink: PAL.ink, sw: 1.4
@@ -569,58 +939,95 @@
     letter('ANS 一键跑通', mX, mY - 148, 30, DINO_COLS.mint);
     letter('最快出自己成品', mX, mY - 52, 24, PAL.ink, { ink: false });
 
-    // Three Finished Project Cards popping out of the chute on arcs!
+    // Three Finished Project Cards popping out of the chute on arcs!（节拍③）
     const chute = [mX + 220, mY - 155];
     const cards = [
-      { title: '3D 个人作品集', sub: '一键同款上线', col: '#9BE0C5', target: [1260, 290], t0: tPress + 0.08, rot: -0.04 },
-      { title: '4K 漫剧与视频', sub: '分镜直出成片', col: '#FFE082', target: [1610, 460], t0: tPress + 0.28, rot: 0.05 },
-      { title: 'CAUAI 无限画布', sub: '多节点工作流', col: '#F4A6B8', target: [1345, 650], t0: tPress + 0.48, rot: -0.03 }
+      { title: '3D 个人作品集', sub: '一键同款上线', col: '#9BE0C5', target: [1260, 290], t0: card0, rot: -0.04 },
+      { title: '4K 漫剧与视频', sub: '分镜直出成片', col: '#FFE082', target: [1610, 460], t0: card0 + cardGap, rot: 0.05 },
+      { title: 'CAUAI 无限画布', sub: '多节点工作流', col: '#F4A6B8', target: [1345, 650], t0: card0 + 2 * cardGap, rot: -0.03 }
     ];
-    for (const c of cards) {
-      const fk = easeOut(seg(lt, c.t0, c.t0 + 0.55));
-      if (fk > 0) {
-        const pt = arcPt(chute, c.target, 140, fk);
-        drawProjectCard(pt[0], pt[1], c.title, c.sub, c.col, fk, c.rot);
+    const cardSettle = beatAt(dur, sp.cardSettle);
+    // ── 星形粒子层：画在成品卡与角色之下（星点不再压在卡面/角色身上）────────────
+    glow(chute[0], chute[1], 96 + 30 * Math.sin(t * 2.6), DINO_COLS.mint, 0.3 + 0.22 * Math.sin(t * 2.6));
+    if (lt > tCard3) {
+      for (let i = 0; i < 3; i++) {
+        const pk = pulseF(t), age = 0.28 + 0.72 * (1 - pk), [tx2, ty2] = cards[i].target;   // 拍点最亮
+        sparkle(tx2 + (hash(i) - 0.5) * 120, ty2 - 118 + (hash(i + 5) - 0.5) * 60, 22, age, cards[i].col);
+      }
+    }
+    const cheerK = seg(lt, tCheer, tCheer + beatAt(dur, sp.cheerBurst));
+    if (cheerK > 0 && cheerK < 1) {
+      for (let i = 0; i < 3; i++) {
+        const [tx2, ty2] = cards[i].target;
+        for (let k2 = 0; k2 < 4; k2++) {
+          const a2 = -Math.PI / 2 + (k2 - 1.5) * 0.62;
+          sparkle(tx2 + Math.cos(a2) * (205 + 135 * cheerK), ty2 + Math.sin(a2) * (155 + 115 * cheerK), 24, cheerK, cards[i].col);
+        }
       }
     }
 
+    for (let ci = 0; ci < cards.length; ci++) {
+      const c = cards[ci];
+      const fk = easeOut(seg(lt, c.t0, c.t0 + cardFly));
+      if (fk > 0) {
+        const settled = seg(lt, c.t0 + cardFly, c.t0 + cardFly + cardSettle);
+        const bob = settled * 8 * Math.sin(t * 1.7 + ci * 1.9);            // 落位后持续轻浮（次级动效）
+        const wob = settled * 0.03 * Math.sin(t * 1.2 + ci * 2.3);
+        const pt = arcPt(chute, c.target, 140, fk);
+        drawProjectCard(pt[0], pt[1] + bob, c.title, c.sub, c.col, fk, c.rot + wob, t);
+      }
+    }
+    // 节拍④的星芒已在卡片之下绘制（见上），此处只保留文字层
+
     // Little Dino ("小恐龙") on left celebrating
+    wetHalo(345, 865, 23, DINO_COLS.mint);
     dino(345, 865, 23, {
-      ...emotions(lt, [[0, 'determined'], [tPress, 'excited'], [tPress + 0.7, 'happy']]),
-      aR: 1.25
+      ...emotions(lt, [[0, 'determined'], [tPress, 'excited'], [tPress + beatAt(dur, .06), 'happy'],
+        [tCheer, 'starstruck'], [tCheer + beatAt(dur, .12), 'excited']]),
+      aR: lt > tCheer - beatAt(dur, .02) && lt < tCheer + beatAt(dur, .3) ? 1.25 + 0.35 * Math.sin((lt - tCheer) * 9) : 1.25
     });
 
     // Creator ("我") beside the machine pressing the button & cheering
-    const myJump = jump(lt, tPress - 0.12, tPress + 0.35, 2.2);
-    const myMood = emotions(lt, [[0, 'idea'], [tPress, 'excited'], [tPress + 0.8, 'happy']]);
+    const myJump = jump(lt, tPress - beatAt(dur, .01), tPress + beatAt(dur, .03), 2.2);
+    const myJump2 = jump(lt, tCheer, tCheer + beatAt(dur, .06), 2.0);          // 节拍④·验收庆祝再跳一次
+    const myMood = emotions(lt, [[0, 'idea'], [tPress, 'excited'], [tPress + beatAt(dur, .065), 'happy'],
+      [tCheer - beatAt(dur, .02), 'surprised'], [tCheer + beatAt(dur, .04), 'laugh'], [tCheer + beatAt(dur, .16), 'excited']]);
+    wetHalo(565, 865, 23, '#EFC3AE');
     creator(565, 865, 23, {
       ...myMood,
-      dy: (myMood.dy || 0) + myJump.dy,
-      sq: (myMood.sq || 0) + myJump.sq,
-      aR: lt > tPress - 0.1 && lt < tPress + 0.35 ? 1.45 : 1.05
+      dy: (myMood.dy || 0) + myJump.dy + myJump2.dy,
+      sq: (myMood.sq || 0) + myJump.sq + myJump2.sq,
+      aL: lt > tPress - beatAt(dur, .01) && lt < tPress + beatAt(dur, .03) ? 1.45
+        : lt > tCheer ? 1.35 + 0.3 * Math.sin(t * 8) : 1.05,                  // 双臂镜像同姿
+      aR: lt > tPress - beatAt(dur, .01) && lt < tPress + beatAt(dur, .03) ? 1.45
+        : lt > tCheer ? 1.35 + 0.3 * Math.sin(t * 8) : 1.05
     });
 
     camEnd();
-    storyRibbon('02 · 一键成品', '不用到处翻教程配环境，全网最火硬核 AI 玩法最快速度跑出成品', lt, dur);
-
-    boilSeed('trans_3');
-    if (lt < 0.3) brushWipe(0.5 + lt / 0.6, WIPE_GOLD);
-    if (lt > dur - 0.3) brushWipe((lt - (dur - 0.3)) / 0.6, WIPE_ROSE);
+    flushLetters();                                     // 场景字先落定，再盖入场遮罩
+    wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除（10 帧 easeInOutQuart）
+    hudBrand(lt, SUBS.S3.title);
+    storyRibbon('S3', t, lt, dur);
+    wipeOut(lt, dur);
   }
 
   // ============================================================================
-  // SHOT 4 (9.0s – 11.8s): 第三件事 — "注册即送算力福利，进来就有免费额度，直接开造，不玩套路"
+  // SHOT 4 (SHOT_T0.s4 → SHOT_T0.s5, 6.8s): 第三件事 — "注册即送算力福利，进来就有免费额度，直接开造，不玩套路"
+  //   节拍① 1.36s 免费算力券飞入定格 → 节拍② 4.62s 金币光环再撒一轮，
+  //   节拍之间金币持续升腾闪烁 + 云朵飘动 + 摄像缓移。
   // ============================================================================
-  function shot4Credits(t, lt, dur) {
-    const tGift = 0.55;
+  function shot4Credits(t, lt, dur) {            // dur = SHOT_DUR.s4 (5.357s)
+    const b = BEATS.s4;
+    const tGift = beatAt(dur, b.gift);            // 1.36s 节拍①·免费算力券飞入定格
+    const tCheer = beatAt(dur, b.cheer);          // 4.62s 节拍②·金币光环再撒一轮
     camBegin(
       960 + 10 * Math.sin(lt * 0.8),
-      kf(lt, [[0, 540], [tGift + 0.4, 525], [dur, 530]]),
-      kf(lt, [[0, 1.0], [tGift + 0.5, 1.04], [dur, 1.02]])
+      kf(lt, [[0, 540], [tGift + beatAt(dur, .06), 528], [tCheer, 520], [dur, 516]]),
+      kf(lt, [[0, 1.06], [tGift + beatAt(dur, .07), 1.04], [tCheer, 1.02], [dur, 1.00]])   // 1.06→1.00 拉回
     );
 
     // Rich Outdoor Pastel Meadow & Cloud Carnival Scene!
-    boilSeed('shot4_sky');
+    staticSeed('shot4_sky');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#DDF2FA', ink: null });
     paint(ellPts(W * 0.5, 340, 950, 320, 30, 12), {
       fill: '#FFE8A3', fillOp: 110, bleed: 0.3, tex: 0.55, ink: null
@@ -631,7 +1038,7 @@
     paintCloud(1480, 330, 100, 38, '#FFFDF7', 's4c4');
 
     // Rolling Green Hills in Midground
-    boilSeed('shot4_hills');
+    staticSeed('shot4_hills');
     paint(ellPts(380, 920, 720, 240, 36, 2), {
       wash: '#88C978', fill: '#5E9E54', fillOp: 85, bleed: 0.1, ink: PAL.ink, sw: 1.2
     });
@@ -642,12 +1049,7 @@
     paintFloorAndRug(865, '#C8E6B2', '#95C47C', '#E23E36', '#E8AA38', 's4');
     paintStringLights(105, 65, 12, t, '#FFE066', 's4');
 
-    // Top banner
-    boilSeed('shot4_header');
-    paint(rrPts(490, 44, 940, 70, 18, 1.5), {
-      wash: '#2B2233', washOp: 248, ink: PAL.ink, sw: 1.3
-    });
-    letter('第三件：注册即送免费算力福利 · 进来直接开造 · 0套路', 960, 79, 30, '#FFE066');
+    // 顶部横幅 → 屏幕空间 HUD
 
     // Giant glowing arched ANS Portal Door in center background
     boilSeed('ans_door');
@@ -660,49 +1062,69 @@
     });
 
     // Floating Golden Compute Coins & Sparkles around the arch
+    const cheerK = seg(lt, tCheer, tCheer + beatAt(dur, .14));
     for (let i = 0; i < 8; i++) {
       boilSeed('coin_' + i);
       const ang = -Math.PI * 0.88 + (i / 7) * Math.PI * 0.76;
-      const rad = 430 + 35 * Math.sin(t * 3 + i);
+      const rad = 430 + 35 * Math.sin(t * 3 + i) + 60 * easeOut(cheerK) * (i % 2 ? 1 : .6);   // 节拍②·金币外扩
       const cx = 960 + Math.cos(ang) * rad * 1.25;
-      const cy = 540 + Math.sin(ang) * rad * 0.68;
+      const cy = 540 + Math.sin(ang) * rad * 0.68 - 22 * Math.sin(t * 1.3 + i * 1.1);          // 持续升腾（次级动效）
       paint(ellPts(cx, cy, 28, 28, 16, 1.0), {
         wash: '#FFD95A', fill: PAL.ochre, fillOp: 100, ink: PAL.ink, sw: 1.0
       });
       paint(starPts(cx, cy, 15, 0.4, 4, t * 2 + i), { wash: PAL.cream, ink: null });
+      const ck = pulseF(t);                                     // 帧对齐拍点：同拍同闪（原 i*0.13 相位散开）
+      if (ck > 0.45) glow(cx, cy, 46, '#FFD95A', 0.55 * ck);                                   // 节拍锁定闪烁
+    }
+    // 节拍②·金币光环再撒一轮（填充动效，纯 lt 驱动）
+    if (cheerK > 0 && cheerK < 1) {
+      for (let i = 0; i < 10; i++) {
+        const a2 = (i / 10) * TAU + 0.3, rr = 130 + 620 * easeOut(cheerK);
+        sparkle(960 + Math.cos(a2) * rr, 620 + Math.sin(a2) * rr * 0.55, 24, cheerK, '#FFD96A');
+      }
     }
 
     // Little Dino ("小恐龙") on right, flanking the golden ticket!
     const dinoWalk = stroll(lt, 0, tGift, 1460, 1310, 26);
-    const dinoMood = emotions(lt, [[0, 'happy'], [tGift, 'love'], [tGift + 0.8, 'excited']]);
+    const dinoHop = jump(lt, tCheer, tCheer + beatAt(dur, .07), 2.0);          // 节拍②·再蹦一次
+    const dinoMood = emotions(lt, [[0, 'happy'], [tGift, 'love'], [tGift + beatAt(dur, .12), 'excited'],
+      [tCheer, 'starstruck'], [tCheer + beatAt(dur, .09), 'love']]);
+    wetHalo(dinoWalk.x, 865, 26, DINO_COLS.mint);
     dino(dinoWalk.x, 865, 26, {
       ...dinoMood,
       flip: true,
       walk: dinoWalk.walk,
-      dy: (dinoMood.dy || 0) + dinoWalk.dy,
+      dy: (dinoMood.dy || 0) + dinoWalk.dy + dinoHop.dy,
+      sq: (dinoMood.sq || 0) + dinoHop.sq,
       aL: 1.15,
-      aR: 1.05
+      aR: lt > tCheer ? 1.05 + 0.4 * Math.sin(t * 8) : 1.05
     });
 
     // Creator ("我") on left, flanking the golden ticket and cheering!
     const myWalk = stroll(lt, 0, tGift, 460, 610, 26);
-    const myMood = emotions(lt, [[0, 'surprised'], [tGift + 0.1, 'starstruck'], [tGift + 0.85, 'laugh']]);
+    const myHop = jump(lt, tCheer, tCheer + beatAt(dur, .07), 2.0);
+    const myMood = emotions(lt, [[0, 'surprised'], [tGift + beatAt(dur, .015), 'starstruck'], [tGift + beatAt(dur, .125), 'laugh'],
+      [tCheer, 'love'], [tCheer + beatAt(dur, .09), 'starstruck']]);
+    wetHalo(myWalk.x, 865, 25, '#EFC3AE');
     creator(myWalk.x, 865, 25, {
       ...myMood,
       walk: myWalk.walk,
-      dy: (myMood.dy || 0) + myWalk.dy,
-      aR: 1.15
+      dy: (myMood.dy || 0) + myWalk.dy + myHop.dy,
+      sq: (myMood.sq || 0) + myHop.sq,
+      aL: lt > tCheer ? 1.15 + 0.4 * Math.sin(t * 8 + 1) : 1.15,               // 双臂镜像同姿
+      aR: lt > tCheer ? 1.15 + 0.4 * Math.sin(t * 8 + 1) : 1.15
     });
 
     // Giant Glowing "🎁 FREE 免费算力券" Floating in the center arch at y = 435!
     boilSeed('gift_ticket');
-    const tkK = backOut(seg(lt, 0.2, tGift + 0.25));
-    const tkX = 960, tkY = 435 + Math.sin(t * 5) * 8;
+    const tkK = backOut(seg(lt, beatAt(dur, b.ticketIn), tGift + beatAt(dur, .036)));
+    const tkBump = 1 + 0.07 * Math.max(0, spring(lt, tCheer, 4, 14));         // 节拍②·算力券弹跳
+    const tkX = 960, tkY = 435 + Math.sin(t * 5) * 8 - 9 * Math.sin(t * 0.85);
     push();
     translate(tkX, tkY);
     rotate(-0.03 + 0.02 * Math.sin(t * 4));
-    scale(tkK);
-    glow(0, 0, 250, '#FFD96A', 0.9);
+    scale(tkK * tkBump);
+    glow(0, 0, 250 + 26 * Math.sin(t * 3.2), '#FFD96A', 0.9 * (0.9 + 0.1 * Math.sin(t * 2.4)));
     paint(rrPts(-245, -108, 490, 216, 24, 2.0), {
       wash: '#FFE47A', washOp: 255, fill: PAL.ochre, fillOp: 110, bleed: 0.15, tex: 0.5,
       ink: PAL.ink, sw: 1.8
@@ -721,28 +1143,38 @@
     }
 
     camEnd();
-    storyRibbon('03 · 算力福利', '注册即送免费算力额度，进来就能直接开造，不玩任何套路', lt, dur);
-
-    boilSeed('trans_4');
-    if (lt < 0.3) brushWipe(0.5 + lt / 0.6, WIPE_ROSE);
-    if (lt > dur - 0.3) brushWipe((lt - (dur - 0.3)) / 0.6, WIPE_MINT);
+    flushLetters();                                     // 场景字先落定，再盖入场遮罩
+    wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除
+    hudBrand(lt, SUBS.S4.title);
+    storyRibbon('S4', t, lt, dur);
+    wipeOut(lt, dur);
   }
 
   // ============================================================================
-  // SHOT 5 (11.8s – 15.0s): 终章立 Flag — "28 天挑战：要么每日真改进，要么 Full Reset 全员认罚发算力！"
+  // SHOT 5 (SHOT_T0.s5 → SHOT_T0.s6 = 29.143 → 43.700, 14.557s): 终章立 Flag — 重构成三段
+  //   段① 29.600s 起 20 帧日历 1.00→1.14 ease-out cubic 缓推 → 30.733s 「Day 01」hero 落章
+  //        （3 帧上抬预备 → 4 帧砸下 → 接触帧 squash 1.25x/0.8x → 2 帧白闪 → 全屏墨点溅开）
+  //   段② 31.350s 拉回广角 → 33.000s 插旗入地 + 金色爆发
+  //   段③ 38.500s FULL RESET 警示 + 双主角宣誓 → 43.400s 起薄荷笔刷扫走舞台，交给落版段
+  //   本幕不再有虹膜收黑；节拍全部写成幕内绝对秒（口播边界与落版起点都是绝对时间）。
   // ============================================================================
-  function shot5Flag(t, lt, dur) {
-    const tPlant = 0.65;
-    const tIris = dur - 0.55;
-    const shake = lt > tPlant && lt < tPlant + 0.45 ? shakeXY(t, 9 * Math.exp(-(lt - tPlant) * 6)) : [0, 0];
+  function shot5Flag(t, lt, dur) {               // dur = SHOT_DUR.s5 (14.557s)
+    const tPush = T5.push, tStampTop = T5.stampTop, tImpact = T5.stamp;
+    const tPullBack = T5.pullBack, tPullBackEnd = T5.pullBackEnd;
+    const tFlagStart = T5.flagStart, tPlant = T5.plant, tReset = T5.reset;
+    const poleX = 960;
+    // 三段式摄像：广角开场 → 20 帧缓推日历 → 落章保持 → 拉回广角 → 宣誓再缓推
+    const pushK = easeOut(seg(lt, tPush, tPush + 20 / 24));        // ease-out cubic，20 帧 1.00→1.14
+    const backK = ease(seg(lt, tPullBack, tPullBackEnd));
+    const shake = lt > tPlant && lt < tPlant + 0.16 ? shakeXY(t, 9 * Math.exp(-(lt - tPlant) * 6)) : [0, 0];
     camBegin(
-      960 + shake[0] + 10 * Math.sin(lt * 0.7),
-      kf(lt, [[0, 540], [tPlant + 0.2, 515], [dur, 505]]) + shake[1],
-      kf(lt, [[0, 0.98], [tPlant + 0.3, 1.03], [dur, 1.06]])
+      lerp(lerp(960, 450, pushK), 968, backK) + shake[0] + 10 * Math.sin(lt * 0.7),
+      lerp(lerp(544, 490, pushK), 512, backK) + shake[1] + 6 * Math.sin(lt * 0.5),
+      lerp(lerp(0.98, 1.14, pushK), 1.06, backK)
     );
 
     // Rich Sunrise Celebration Horizon & Layered Mountains
-    boilSeed('shot5_sky');
+    staticSeed('shot5_sky');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#FFF4DC', ink: null });
     paint(ellPts(W * 0.5, 420, 1050, 380, 30, 12), {
       fill: '#FFD599', fillOp: 120, bleed: 0.3, tex: 0.55, ink: null
@@ -751,23 +1183,25 @@
       fill: '#B5EDD8', fillOp: 110, bleed: 0.28, tex: 0.5, ink: null
     });
     // Distant sunrise hills behind stage
-    boilSeed('shot5_hills');
+    staticSeed('shot5_hills');
     paint(ellPts(960, 910, 980, 210, 36, 2), {
       wash: '#9BD6B8', fill: '#6AB092', fillOp: 80, ink: PAL.ink, sw: 1.1
     });
-    paintCloud(220, 185, 115, 42, '#FFFFFF', 's5c1');
-    paintCloud(1700, 185, 115, 42, '#FFFFFF', 's5c2');
+    paintCloud(220 + Math.sin(t * 0.28) * 34, 185 + Math.sin(t * 0.19) * 9, 115, 42, '#FFFFFF', 's5c1');
+    paintCloud(1700 - Math.sin(t * 0.28) * 34, 185 + Math.cos(t * 0.17) * 9, 115, 42, '#FFFFFF', 's5c2');
 
     paintFloorAndRug(865, '#DFCFAF', '#BFA882', '#9BE0C5', '#E8AA38', 's5');
     paintStringLights(98, 55, 12, t, '#FFE066', 's5');
 
-    // Top Hero Brand Sign: ANS · AI Never Stops (ans.cauai.fun)
-    boilSeed('shot5_brand');
-    glow(960, 110, 360, DINO_COLS.mint, 0.75);
-    paint(rrPts(470, 38, 980, 92, 24, 1.8), {
-      wash: '#2B2233', washOp: 250, fill: PAL.indigo, fillOp: 90, ink: PAL.ink, sw: 1.6
-    });
-    letter('ANS · AI Never Stops   |   ans.cauai.fun', 960, 84, 38, DINO_COLS.mint);
+    // ── 星形粒子层：统一画在日历卡/Reset 板与双主角之下（星点不再压在卡框上、肚皮上）──
+    if (lt > tPlant) {
+      for (let i = 0; i < 5; i++) {
+        const k2 = frac(lt / 3.6 + i / 5);
+        sparkle(poleX - 200 + i * 100 + Math.sin(lt * 0.9 + i) * 30, 800 - k2 * 520, 12, Math.sin(k2 * Math.PI) * 0.7, PAL.cream);
+      }
+    }
+
+    // 顶部品牌锁定 → 屏幕空间 HUD（hudBrand），滑入落位后才显示 URL（D4）
 
     // LEFT BOARD: Option A — "28-Day Daily Meaningful Upgrade Calendar"
     boilSeed('board_calendar');
@@ -785,7 +1219,9 @@
         const dIdx = r * 7 + c;
         const gx = 162 + c * 53, gy = 425 + r * 56;
         const isDay1 = dIdx === 0;
-        paint(rrPts(gx, gy, 44, 44, 8, 0.6), {
+        // Day 01 格子在打卡节拍之前保持呼吸微光（节拍之间画面不冻结）
+        const breathe = isDay1 ? 1 + 0.03 * Math.sin(t * 2.6) : 1;
+        paint(rrPts(gx + 22 - 22 * breathe, gy + 22 - 22 * breathe, 44 * breathe, 44 * breathe, 8, 0.6), {
           wash: isDay1 ? '#FFE066' : '#E8E0D0',
           fill: isDay1 ? DINO_COLS.mint : null,
           fillOp: 120,
@@ -793,7 +1229,28 @@
         });
       }
     }
-    letter('✓ Day 01 已打卡!', 345, 660, 25, PAL.sap, { ink: false });
+    // ── 节拍③ · 「Day 01」hero 落章（接触帧 30.733s）────────────────────────────
+    //    3 帧上抬预备 → 4 帧砸下（easeIn 加速）→ 接触帧 squash 1.25x/0.8x → 弹簧回弹。
+    //    白闪与墨点溅开在屏幕空间绘制（见 camEnd 之后），保证全屏冲击力。
+    const liftK = seg(lt, tStampTop - STAMP.lift, tStampTop);
+    const slamK = easeIn(seg(lt, tStampTop, tImpact));
+    if (lt > tStampTop - STAMP.lift) {
+      const rise = liftK * (1 - slamK);                       // 0→1→0：抬起到顶点再砸下
+      const age = lt - tImpact;
+      const sqK = age >= 0 ? Math.exp(-13 * age) : 0;         // 接触帧 = 1
+      const wob = spring(lt, tImpact, 5, 16);                 // 落地回弹（t<tImpact 时为 0）
+      push();
+      translate(STAMP.x, STAMP.y - 92 * rise);
+      scale((1 + 0.42 * rise) * (1 + 0.25 * sqK + 0.10 * wob),
+            (1 + 0.42 * rise) * (1 - 0.20 * sqK - 0.10 * wob));
+      glow(0, 0, 60 + 210 * sqK + 40 * rise, PAL.sap, 0.5 + 0.5 * sqK);
+      paint(starPts(0, 0, 47, 0.42, 5, -Math.PI / 2 + 0.55 * rise), {
+        wash: PAL.sap, fill: PAL.cream, fillOp: 85, ink: PAL.ink, sw: 1.3
+      });
+      paint(ellPts(0, 0, 20, 20, 16), { wash: DINO_COLS.mint, washOp: 235, ink: PAL.ink, sw: 1.0 });
+      pop();
+    }
+    letter('✓ Day 01 已打卡！', 345, 660, 26, PAL.sap, { pop: seg(lt, tImpact, tImpact + 0.18) });
 
     // RIGHT BOARD: Option B — "⚡ FULL RESET 全员额度重置认罚拉闸"
     boilSeed('board_reset');
@@ -809,23 +1266,28 @@
     paint(rrPts(1435, 425, 280, 195, 20, 1.4), {
       wash: '#2B2233', ink: PAL.ink, sw: 1.4
     });
-    paint(ellPts(1575, 522, 86, 78, 24, 1.2), {
+    // 节拍④：FULL RESET 警示脉冲 — 既有元素原地发光/轻颤，坐标体系与造型完全不变
+    const resetA = seg(lt, tReset, tReset + beatAt(dur, .04));
+    const jigX = resetA * 6 * Math.sin(t * 17), jigY = resetA * 5 * Math.sin(t * 14 + 1);
+    if (resetA > 0) glow(1575 + jigX, 522 + jigY, 150 + 70 * (0.5 + 0.5 * Math.sin(t * 5.5)) * resetA, '#E23E36', 0.85 * resetA);
+    paint(ellPts(1575 + jigX, 522 + jigY, 86, 78, 24, 1.2), {
       wash: '#FFE066', fill: '#E23E36', fillOp: 95, ink: PAL.ink, sw: 1.5
     });
-    letter('FULL RESET', 1575, 522, 22, PAL.ink, { ink: false });
-    letter('绝不鸽 · 每天二选一', 1575, 655, 24, PAL.ink, { ink: false });
+    letter('FULL RESET', 1575 + jigX, 522 + jigY, 22, PAL.ink, { ink: false });
+    letter('绝不鸽 · 每天二选一', 1575, 655, 26, PAL.ink, { pop: seg(lt, tReset + beatAt(dur, .012), tReset + beatAt(dur, .045)) });
 
     // CENTER: The Giant "🟢 Day 01 / 28" Flag planted by Creator ("我") & Little Dino ("小恐龙")!
     boilSeed('center_flag');
-    const flagDrop = easeOut(seg(lt, 0.1, tPlant));
+    const flagDrop = easeOut(seg(lt, tFlagStart, tPlant));
     const flagBounce = spring(lt, tPlant, 6, 18) * 18;
-    const poleX = 960, poleBottom = lerp(220, 865, flagDrop) + flagBounce;
+    const poleBottom = lerp(220, 865, flagDrop) + flagBounce;
     const poleTop = poleBottom - 640;
 
+    // 节拍②：插旗瞬间的金色粒子爆发（持续上浮的金色余芒已移到"角色之下"的粒子层）
     if (lt >= tPlant) {
-      glow(poleX, poleTop + 130, 340, '#FFE066', 0.85);
+      glow(poleX, poleTop + 130, 340 + 34 * Math.sin(t * 2.2), '#FFE066', 0.85 * (0.85 + 0.15 * Math.sin(t * 1.9)));
       for (let i = 0; i < 8; i++) {
-        const q = seg(lt - tPlant, i * 0.04, 0.65 + i * 0.04);
+        const q = seg(lt - tPlant, i * 0.03, 0.9 + i * 0.03);
         const a = -Math.PI * 0.9 + (i / 7) * Math.PI * 0.8;
         sparkle(poleX + Math.cos(a) * 260 * q, poleTop + 120 + Math.sin(a) * 180 * q, 26, q, '#FFE066');
       }
@@ -843,7 +1305,7 @@
       });
     }
 
-    const wave = Math.sin(t * 7) * 14;
+    const wave = Math.sin(t * 7) * (12 + 8 * pulse2F(t));        // 旗帜随拍加幅（帧对齐拍点）
     const flagPts = [
       [poleX + 10, poleTop + 15],
       [poleX + 190, poleTop + 5 + wave],
@@ -858,49 +1320,153 @@
       ink: PAL.ink, sw: 1.6, curv: 0.25
     });
     letter('🟢 Day 01 / 28', poleX + 185, poleTop + 78, 34, PAL.ink, { ink: false });
-    letter('让改进开始吧！', poleX + 185, poleTop + 138, 28, '#D8394E', { ink: false });
+    letter('让改进开始吧！', poleX + 185, poleTop + 138, 28, '#D8394E', { ink: false, pop: seg(lt, tPlant + beatAt(dur, .012), tPlant + beatAt(dur, .04)) });
 
     // Creator ("我") on left of flagpole
-    const myHop = jump(lt, 0.2, tPlant, 2.5);
-    const myMood = emotions(lt, [[0, 'determined'], [tPlant, 'excited'], [tPlant + 0.75, 'happy']]);
+    // 双臂取同一角度（镜像同姿）：左右两臂的绘制代码完全一致，只有姿态角 aL/aR 不同才会
+    // 出现"一臂更细/肩关节开缝"的观感 —— 同姿后两侧必然等粗、关节一致（几何在 ans_chars.js 内，不改）
+    const myArm = lt > tPlant + 0.9 ? 1.06 + 0.26 * Math.sin(t * 8) * (0.55 + 0.45 * Math.sin(t * 0.9)) : 1.25;
+    const myHop = jump(lt, tPlant - 0.95, tPlant, 2.5);
+    const myHop2 = jump(lt, tImpact, tImpact + 0.22, 2.0);                    // 节拍③·落章欢呼
+    const myHop3 = jump(lt, tReset + 0.12, tReset + 0.34, 2.3);               // 节拍④·宣誓起跳
+    const myMood = emotions(lt, [
+      [0, 'determined'], [tPlant, 'excited'], [tPlant + 0.35, 'happy'],
+      [tImpact, 'starstruck'], [tImpact + 0.45, 'excited'],
+      [tReset, 'determined'], [tReset + 0.35, 'laugh']
+    ]);
+    wetHalo(760, 865, 25, '#EFC3AE');
     creator(760, 865, 25, {
       ...myMood,
-      dy: (myMood.dy || 0) + myHop.dy,
-      sq: (myMood.sq || 0) + myHop.sq,
-      aL: lt > tPlant + 0.5 ? 1.15 + 0.45 * Math.sin(t * 12) : 0.4,
-      aR: 1.25
+      dy: (myMood.dy || 0) + myHop.dy + myHop2.dy + myHop3.dy,
+      sq: (myMood.sq || 0) + myHop.sq + myHop2.sq + myHop3.sq,
+      aL: myArm,
+      aR: myArm
     });
 
     // Little Dino ("小恐龙") on right of flagpole
-    const dinoHop = jump(lt, 0.25, tPlant + 0.05, 3.0);
-    const dinoMood = emotions(lt, [[0, 'excited'], [tPlant + 0.05, 'starstruck'], [tPlant + 0.8, 'love']]);
+    const dinoHop = jump(lt, tPlant - 0.85, tPlant + 0.15, 3.0);
+    const dinoHop2 = jump(lt, tImpact, tImpact + 0.22, 2.2);                  // 节拍③·落章欢呼
+    const dinoHop3 = jump(lt, tReset + 0.12, tReset + 0.34, 2.3);             // 节拍④·宣誓起跳
+    const dinoMood = emotions(lt, [
+      [0, 'excited'], [tPlant + 0.15, 'starstruck'], [tPlant + 0.60, 'love'],
+      [tImpact, 'excited'], [tImpact + 0.50, 'starstruck'],
+      [tReset, 'determined'], [tReset + 0.35, 'excited']
+    ]);
+    wetHalo(1160, 865, 25, DINO_COLS.mint);
     dino(1160, 865, 25, {
       ...dinoMood,
       flip: true,
-      dy: (dinoMood.dy || 0) + dinoHop.dy,
-      sq: (dinoMood.sq || 0) + dinoHop.sq,
+      dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy + dinoHop3.dy,
+      sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq + dinoHop3.sq,
       aL: 1.25,
-      aR: lt > tPlant + 0.5 ? 1.2 + 0.45 * Math.sin(t * 12 + 1) : 0.8
+      aR: lt > tPlant + beatAt(dur, .16) ? 1.0 + 0.6 * Math.sin(t * 9 + 1) * (0.55 + 0.45 * Math.sin(t * 0.9 + 1)) : 0.8
     });
 
-    const centerDuo = toScreen(960, 865 - 6 * 25);
+    const stampScreen = toScreen(STAMP.x, STAMP.y);
     camEnd();
 
-    storyRibbon('28天 Flag', '要么每日上线清晰有感的真改进，要么直接 Full Reset 全员额度重置！', lt, dur);
+    // 节拍④的红光警示（屏幕空间一次性闪光；沿用既有 flash，不改造型）
+    if (lt > tReset && lt < tReset + 0.18) flash(0.16 * (1 - seg(lt, tReset, tReset + 0.18)), '#E23E36');
 
-    boilSeed('trans_5');
-    if (lt < 0.3) brushWipe(0.5 + lt / 0.6, WIPE_MINT);
-    if (lt > tIris) {
-      const r = lerp(1600, 0, easeIn(seg(lt, tIris, dur - 0.04)));
-      iris(...centerDuo, r);
+    // 落章 hero 的收尾：接触后 2 帧白闪 + 全屏墨点溅开（屏幕空间，冲击力优先）
+    const impAge = lt - tImpact;
+    if (impAge > 0) {
+      const flashK = seg(impAge, 0, 1 / 24) * (1 - seg(impAge, 1 / 24, STAMP.flash));
+      if (flashK > 0) flash(0.88 * flashK, '#FFFDF6');
+      const spK = seg(impAge, 0, STAMP.splat);
+      if (spK > 0 && spK < 1) {
+        boilSeed('stamp_splat');
+        for (let i = 0; i < 22; i++) {
+          const a2 = (i / 22) * TAU + hash(i) * 0.7;
+          const rr = (70 + 780 * hash(i + 7)) * easeOut(spK);
+          const sz = (7 + 20 * hash(i + 13)) * (1 - spK * 0.3);
+          paint(ellPts(stampScreen[0] + Math.cos(a2) * rr, stampScreen[1] + Math.sin(a2) * rr * 0.92, sz * 1.3, sz, 12, 0.9),
+            { wash: PAL.ink, washOp: 255 * (1 - spK * 0.2), ink: null });
+        }
+      }
     }
+
+    flushLetters();                                     // 场景字先落定，再盖入场遮罩
+    wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除
+    hudBrand(lt, SUBS.S5.title);
+    storyRibbon('S5', t, lt, dur);
+    wipeOut(lt, dur);                                   // 43.400s 起扫走舞台 → 落版段接棒
   }
 
+  // ============================================================================
+  // END CARD (SHOT_T0.s6 → FILM_DUR = 43.700 → 45.900, 2.20s) — 专属落版段（D8 加长，微动不断帧）
+  //   Act5 的薄荷笔刷在 43.700s 铺满，本段头 0.6s 让同一批笔触拖开，露出奶油纸底的字锁版：
+  //   「ANS · AI Never Stops」+「ans.cauai.fun」+「Day 01 / 28」+ 小字 CTA「注册即送算力 · 0 套路」。
+  //   全部手绘笔触（ribbon 大笔扫 / paint 圆角条 / letter）+ 4 角星点。最后一帧 = 完整落版定格。
+  // ============================================================================
+  function endCardLockup(t, lt, dur) {           // dur = SHOT_DUR.s6 (2.200s)
+    staticSeed('end_paper');
+    paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#FFFDF6', ink: null });
+    paint(ellPts(W * 0.5, 430, 980, 620, 30, 14), {
+      fill: DINO_COLS.mint, fillOp: 72, bleed: 0.32, tex: 0.5, ink: null
+    });
+    paint(ellPts(330, 235, 520, 300, 26, 12), { fill: '#FFE082', fillOp: 85, bleed: 0.3, tex: 0.5, ink: null });
+    paint(ellPts(1640, 895, 560, 320, 26, 12), { fill: PAL.rose, fillOp: 55, bleed: 0.3, tex: 0.5, ink: null });
+
+    // 手绘薄荷大笔扫（落版主视觉笔触）——缓慢呼吸位移，定格期间画面不死
+    const drift = 10 * Math.sin(lt * 2.2);
+    boilSeed('end_swash');
+    // 薄荷大笔扫 = 字锁版的手绘高光底：不描边，任何墨线都不会穿过字身
+    paint(ribbon([[300 + drift, 366], [700 + drift, 348], [1160 + drift, 362], [1620 + drift, 336]], 138, 108), {
+      wash: DINO_COLS.mint, washOp: 225, fill: DINO_COLS.mintDk, fillOp: 38, bleed: 0.18, tex: 0.5, ink: null
+    });
+    // 金色手绘下划线：压 URL 之下，同样不穿字
+    paint(ribbon([[520 - drift, 542], [960, 532], [1400 - drift, 540]], 18, 10), {
+      wash: PAL.ochre, washOp: 255, bleed: 0.1, tex: 0.4, ink: PAL.ochre, sw: 0.6, curv: 0.5
+    });
+    // 金色小星点（在字之下）
+    for (let i = 0; i < 6; i++) {                                  // 连续缓动，不做拍点跳变（无单帧亮度突变）
+      const gl = 0.5 + 0.5 * Math.sin(lt * 2.4 + i * 1.7);
+      sparkle(230 + i * 290 + (hash(i) - 0.5) * 90, 250 + (hash(i + 5) - 0.5) * 210 + Math.sin(lt * 0.9 + i) * 14,
+        20, 0.30 + 0.30 * gl, '#FFE066');
+    }
+    // D8：落版期间每帧都有 ≥0.03 的连续微动（扫光带 + 上浮微粒），杜绝 12fps 步进/整帧复制
+    const sweepX = lerp(-620, W + 620, frac(lt / 2.7));
+    glow(sweepX, 420, 560, '#FFE066', 0.30);
+    glow(sweepX - 180, 300, 380, DINO_COLS.mint, 0.22);
+    for (let i = 0; i < 7; i++) {
+      const k2 = frac(lt / 2.1 + i / 7);
+      sparkle(300 + i * 220 + Math.sin(lt * 1.3 + i) * 26, 940 - k2 * 760, 11, Math.sin(k2 * Math.PI) * 0.6, DINO_COLS.mint);
+    }
+
+    // 字锁版
+    boilSeed('end_lockup');
+    // D8：锁版四件套在 43.70–44.50 全部就位，留 1.4s 可读停留
+    const ENDCARD = { lg: .068, url: .127, chip: .191, cta: .250, span: .114 };   // ×dur(2.2s) = 0.15/0.28/0.42/0.55s
+    const lgK = backOut(seg(lt, beatAt(dur, ENDCARD.lg), beatAt(dur, ENDCARD.lg + ENDCARD.span)));
+    const urlK = backOut(seg(lt, beatAt(dur, ENDCARD.url), beatAt(dur, ENDCARD.url + ENDCARD.span)));
+    const chipK = backOut(seg(lt, beatAt(dur, ENDCARD.chip), beatAt(dur, ENDCARD.chip + ENDCARD.span)));
+    const ctaK = backOut(seg(lt, beatAt(dur, ENDCARD.cta), beatAt(dur, ENDCARD.cta + ENDCARD.span)));
+    glow(960, 360, 420 + 30 * Math.sin(t * 2.4), DINO_COLS.mint, 0.55);
+    letter('ANS · AI Never Stops', 960, 366, 104, PAL.ink, { pop: lgK });
+    letter('ans.cauai.fun', 960, 486, 54, '#2B7A72', { pop: urlK });          // 深松绿 + 墨影，奶油底上可读
+    push();
+    translate(960, 620);
+    scale(1, chipK);
+    paint(rrPts(-212, -40, 424, 80, 20, 1.4), {
+      wash: '#2B2233', washOp: 252, ink: PAL.ink, sw: 1.4
+    });
+    pop();
+    if (chipK > 0.3) letter('🟢 Day 01 / 28', 960, 620, 44, DINO_COLS.mint, { pop: chipK, ink: false });
+    letter('注册即送算力 · 0 套路', 960, 716, 34, '#D8394E', { pop: ctaK, ink: false });
+
+    flushLetters();                                     // 锁版字先落定，再让擦除收走（避免字浮在遮罩上）
+    wipeIn(lt);                                         // 统一转场：起手 10 帧把舞台的擦除收走
+  }
+
+  // The shot list is derived from SHOT_T0: re-time the film by editing that one table (+ FILM_DUR in
+  // src/config.js). Each shot's dur = the gap to the next entry (see SHOT_DUR above); s6 is the end card.
   shots([
-    [0.0, shot1Bookmarks],
-    [3.0, shot2Models],
-    [6.0, shot3Projects],
-    [9.0, shot4Credits],
-    [11.8, shot5Flag]
+    [SHOT_T0.s1, shot1Bookmarks],   //  0.000 →  7.027   7.027s 痛点暴击（片头笔刷入场）
+    [SHOT_T0.s2, shot2Models],      //  7.027 → 14.760   7.733s 第一件·顶配模型（1.00→1.06 缓推）
+    [SHOT_T0.s3, shot3Projects],    // 14.760 → 23.786   9.026s 第二件·一键成品（背景 2% 视差）
+    [SHOT_T0.s4, shot4Credits],     // 23.786 → 29.143   5.357s 第三件·算力福利（1.06→1.00 拉回）
+    [SHOT_T0.s5, shot5Flag],        // 29.143 → 43.700  14.557s 28 天 Flag（缓推+落章 / 插旗 / Full Reset）
+    [SHOT_T0.s6, endCardLockup]     // 43.700 → 45.000   1.300s 落版 end card（字锁版 + URL + Day 01/28 + CTA）
   ]);
 })();

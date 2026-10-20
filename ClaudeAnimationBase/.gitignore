@@ -1,1 +1,14 @@
 node_modules
+# --- heavy render / QA artifacts: regenerable, never commit (repo bloat guard) ---
+out/frames/
+out/_verify*/
+out/_jury_tmp/
+out/_probe_*
+out/*.mp4
+out/*.wav
+audio/tts_cache/
+audio/out/
+audio/bed_cache/
+out/_*
+out/day01_*
+out/deliver/
