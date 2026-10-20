@@ -12,3 +12,6 @@ audio/bed_cache/
 out/_*
 out/day01_*
 out/deliver/
+out/jury_pack*/
+out/*_check/
+out/*.log
