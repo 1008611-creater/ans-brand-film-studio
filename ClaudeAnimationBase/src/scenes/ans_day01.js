@@ -1016,140 +1016,101 @@
   }
 
   // ============================================================================
-  // SHOT 4 (SHOT_T0.s4 → SHOT_T0.s5, 6.8s): 第三件事 — "注册即送算力福利，进来就有免费额度，直接开造，不玩套路"
-  //   节拍① 1.36s 免费算力券飞入定格 → 节拍② 4.62s 金币光环再撒一轮，
-  //   节拍之间金币持续升腾闪烁 + 云朵飘动 + 摄像缓移。
+  // SHOT 4 (SHOT_T0.s4 → SHOT_T0.s5 = 23.786 → 29.143, 5.357s) · R12 因果动作链
+  //   584 礼物舱落到台面 → 608 舱盖打开·算力券飘出（全片唯一焦点物）→
+  //   631 盖章「已到账」→ 654 券喂进右侧算力机槽口·槽口亮起 → 677 计数器 100→1000 + 小恐龙欢呼
+  //   构图红线（第一优先，高于任何指标）：
+  //     ① 主体永不被裁切：道具/角色全部完整落在画幅内，安全边 ≥64px；
+  //     ② 两个角色始终可见：主理人 x≈400（左）· 小恐龙 x≈1360（右），不被任何道具遮挡；
+  //     ③ 每帧只有一个焦点物，焦点物宽度 ≤ 35% 画幅（算力券 490px = 25.5%）；
+  //     ④ 镜头 zoom 1.000–1.020（含单帧冲击 + EV 冲击叠加），绝不推近到裁切；
+  //     ⑤ 禁止全幅色块 / 跑马灯 / 未裁切残留 / 单帧白闪。
+  //   舞台坐标（zoom=1.00 时世界坐标 = 屏幕坐标）：
+  //     主理人 400 · 台座/礼物舱/算力券 870 · 小恐龙 1360 · 算力机 1592..1822
   // ============================================================================
-  function shot4Credits(t, lt, dur) {            // dur = SHOT_DUR.s4 (5.357s)
-    const b = BEATS.s4;
-    const tGift = beatAt(dur, b.gift);            // 1.36s 节拍①·免费算力券飞入定格
-    const tCheer = beatAt(dur, b.cheer);          // 4.62s 节拍②·金币光环再撒一轮
-    camBegin(
-      960 + 10 * Math.sin((warpT(t) - SHOT_T0.s4) * 0.8),
-      kf(warpT(t), [[SHOT_T0.s4, 540], [SHOT_T0.s4 + tGift + beatAt(dur, .06), 528], [SHOT_T0.s4 + tCheer, 520], [SHOT_T0.s4 + dur, 516]]),
-      kf(warpT(t), [[SHOT_T0.s4, 1.10], [evOf('hatch').t, 1.06], [evOf('prop3').t, 1.02], [SHOT_T0.s4 + dur, 1.00]])   // 10% 单调拉远
-    );
+  const S4 = {
+    landF: 584, openF: 608, stampF: 631, feedF: 654, countF: 677,
+    land: 584 / 24, open: 608 / 24, stamp: 631 / 24, feed: 654 / 24, count: 677 / 24,
+    cx: 870, plinthTop: 800, floorY: 865,
+    creatorX: 400, dinoX: 1360,
+    // 算力机右缘必须留 ≥64px 安全边：zoom 1.026（含 EV 冲击）时右缘 1822 → 屏幕 1853（67px）
+    mx: 1598, my: 380, mw: 210, mh: 480,
+    tw: 490, th: 250, ty: 430, slotY: 445
+  };
+  // 帧精确爆发冲击：只在这五帧给整层世界一记单帧位移（下一帧 34% 衰减）。
+  // EV 的 joltAt 落在 124BPM 拍网格上（与爆发帧差 ±0.5 帧），这里补一记正好踩在爆发帧上的冲击。
+  function s4Kick(t) {
+    const f = Math.round(t * 24);
+    let dx = 0, dy = 0, z = 1;
+    for (const f0 of [S4.landF, S4.openF, S4.stampF, S4.feedF, S4.countF]) {
+      const d = f - f0;
+      if (d < 0 || d > 1) continue;
+      const a = d === 0 ? 1 : 0.34;
+      dx += 7 * a * Math.sin(f0 * 1.7);
+      dy += 6 * a * Math.cos(f0 * 2.3);
+      z += 0.014 * a;
+    }
+    return { dx, dy, zoom: z };
+  }
+  // 单记冲击环（≤8 帧）：14 个手绘墨点沿椭圆外扩 —— 只在道具局部，绝不横扫全幅
+  function s4Ring(t, f, x, y, R, col, life = 7, flat = 0.42) {
+    const a = (t - f / 24) * 24;
+    if (a < 0 || a > life) return;
+    const k = 1 - a / life, rk = easeOut(1 - k);
+    boilSeed('s4ring_' + f);
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * TAU + 0.21, rr = R * (0.42 + 0.78 * rk);
+      paint(ellPts(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr * flat, 13 + 11 * k, 8 + 6 * k, 10, 1.6),
+        { wash: col, washOp: 205 * k, ink: null });
+    }
+  }
 
-    // Rich Outdoor Pastel Meadow & Cloud Carnival Scene!
+  function shot4Credits(t, lt, dur) {
+    const kk = s4Kick(t);
+    const pushK = ease(clamp(lt / dur));
+    camBegin(960 + kk.dx, 540 - 8 * pushK + kk.dy, (1.000 + 0.006 * pushK) * kk.zoom);
+
+    // ── 背景（降饱和 / 降对比：全部压成背景层，不与焦点物抢）──
     staticSeed('shot4_sky');
     paint(rectPts(-400, -300, W + 800, H + 600), { wash: '#DDF2FA', ink: null });
-    paint(ellPts(W * 0.5, 340, 950, 320, 30, 12), {
-      fill: '#FFE8A3', fillOp: 110, bleed: 0.3, tex: 0.55, ink: null
-    });
-    paintCloud(250 + Math.sin(t * 0.5) * 25, 210, 130, 48, '#FFFDF7', 's4c1');
-    paintCloud(1670 - Math.sin(t * 0.5) * 25, 195, 140, 52, '#FFFDF7', 's4c2');
-    paintCloud(460, 340, 95, 36, '#FFFDF7', 's4c3');
-    paintCloud(1480, 330, 100, 38, '#FFFDF7', 's4c4');
-
-    // Rolling Green Hills in Midground
+    paint(ellPts(870, 470, 760, 400, 30, 12), { fill: '#FFE8A3', fillOp: 84, bleed: 0.3, tex: 0.55, ink: null });
+    const cw = warpT(t) * 0.22;
+    paintCloud(250 + Math.sin(cw) * 22, 205, 128, 46, '#FFFDF7', 's4c1');
+    paintCloud(1690 - Math.sin(cw) * 22, 190, 138, 50, '#FFFDF7', 's4c2');
+    paintCloud(520, 330, 92, 34, '#FFFDF7', 's4c3');
     staticSeed('shot4_hills');
-    paint(ellPts(380, 920, 720, 240, 36, 2), {
-      wash: '#88C978', fill: '#5E9E54', fillOp: 85, bleed: 0.1, ink: PAL.ink, sw: 1.2
-    });
-    paint(ellPts(1540, 920, 720, 240, 36, 2), {
-      wash: '#7CC070', fill: '#52924A', fillOp: 85, bleed: 0.1, ink: PAL.ink, sw: 1.2
-    });
-
+    paint(ellPts(380, 930, 720, 230, 36, 2), { wash: '#88C978', fill: '#5E9E54', fillOp: 70, bleed: 0.1, ink: PAL.ink, sw: 1.1 });
+    paint(ellPts(1560, 930, 720, 230, 36, 2), { wash: '#7CC070', fill: '#52924A', fillOp: 70, bleed: 0.1, ink: PAL.ink, sw: 1.1 });
     paintFloorAndRug(865, '#C8E6B2', '#95C47C', '#E23E36', '#E8AA38', 's4');
-    paintStringLights(105, 65, 12, t, '#FFE066', 's4');
+    paintStringLights(105, 65, 12, warpT(t), '#FFE066', 's4');
 
-    // 顶部横幅 → 屏幕空间 HUD
-
-    // Giant glowing arched ANS Portal Door in center background
-    boilSeed('ans_door');
-    glow(960, 510, 480, '#FFD96A', 0.85);
-    paint(rrPts(680, 165, 560, 700, 240, 2.2), {
-      wash: '#2B2233', fill: PAL.indigo, fillOp: 95, ink: PAL.ink, sw: 1.8
-    });
-    paint(rrPts(720, 205, 480, 660, 210, 1.8), {
-      wash: '#FFF6D6', fill: PAL.ochre, fillOp: 110, bleed: 0.25, tex: 0.55, ink: PAL.ink, sw: 1.3
-    });
-
-    // Floating Golden Compute Coins & Sparkles around the arch
-    const cheerK = seg(lt, tCheer, tCheer + beatAt(dur, .14));
-    for (let i = 0; i < 8; i++) {
-      boilSeed('coin_' + i);
-      const ang = -Math.PI * 0.88 + (i / 7) * Math.PI * 0.76;
-      const rad = 430 + 35 * Math.sin(t * 3 + i) + 60 * easeOut(cheerK) * (i % 2 ? 1 : .6);   // 节拍②·金币外扩
-      const cx = 960 + Math.cos(ang) * rad * 1.25;
-      const cy = 540 + Math.sin(ang) * rad * 0.68 - 22 * Math.sin(t * 1.3 + i * 1.1);          // 持续升腾（次级动效）
-      paint(ellPts(cx, cy, 28, 28, 16, 1.0), {
-        wash: '#FFD95A', fill: PAL.ochre, fillOp: 100, ink: PAL.ink, sw: 1.0
-      });
-      paint(starPts(cx, cy, 15, 0.4, 4, t * 2 + i), { wash: PAL.cream, ink: null });
-      const ck = pulseF(t);                                     // 帧对齐拍点：同拍同闪（原 i*0.13 相位散开）
-      if (ck > 0.45) glow(cx, cy, 46, '#FFD95A', 0.55 * ck);                                   // 节拍锁定闪烁
-    }
-    // 节拍②·金币光环再撒一轮（填充动效，纯 lt 驱动）
-    if (cheerK > 0 && cheerK < 1) {
-      for (let i = 0; i < 10; i++) {
-        const a2 = (i / 10) * TAU + 0.3, rr = 130 + 620 * easeOut(cheerK);
-        sparkle(960 + Math.cos(a2) * rr, 620 + Math.sin(a2) * rr * 0.55, 24, cheerK, '#FFD96A');
-      }
-    }
-
-    // Little Dino ("小恐龙") on right, flanking the golden ticket!
-    const dinoWalk = stroll(lt, 0, tGift, 1460, 1310, 26);
-    const dinoHop = jump(lt, tCheer, tCheer + beatAt(dur, .07), 2.0);          // 节拍②·再蹦一次
-    const dinoMood = emotions(lt, [[0, 'happy'], [tGift, 'love'], [tGift + beatAt(dur, .12), 'excited'],
-      [tCheer, 'starstruck'], [tCheer + beatAt(dur, .09), 'love']]);
-    wetHalo(dinoWalk.x, 865, 26, DINO_COLS.mint);
-    dino(dinoWalk.x, 865, 26, {
-      ...dinoMood,
-      flip: true,
-      walk: dinoWalk.walk,
-      dy: (dinoMood.dy || 0) + dinoWalk.dy + dinoHop.dy,
-      sq: (dinoMood.sq || 0) + dinoHop.sq,
-      aL: 1.15,
-      aR: lt > tCheer ? 1.05 + 0.4 * Math.sin(t * 8) : 1.05
-    });
-
-    // Creator ("我") on left, flanking the golden ticket and cheering!
-    const myWalk = stroll(lt, 0, tGift, 460, 610, 26);
-    const myHop = jump(lt, tCheer, tCheer + beatAt(dur, .07), 2.0);
-    const myMood = emotions(lt, [[0, 'surprised'], [tGift + beatAt(dur, .015), 'starstruck'], [tGift + beatAt(dur, .125), 'laugh'],
-      [tCheer, 'love'], [tCheer + beatAt(dur, .09), 'starstruck']]);
-    wetHalo(myWalk.x, 865, 25, '#EFC3AE');
-    creator(myWalk.x, 865, 25, {
+    // ── 主理人（左，永不被道具遮挡：所有道具都在 x≥625）──
+    const myMood = emotions(lt, [
+      [0, 'happy'],
+      [S4.land - SHOT_T0.s4, 'surprised'],
+      [S4.land - SHOT_T0.s4 + 2 / 24, 'starstruck'],
+      [S4.open - SHOT_T0.s4, 'laugh'],
+      [S4.stamp - SHOT_T0.s4, 'surprised'],
+      [S4.feed - SHOT_T0.s4, 'love'],
+      [S4.count - SHOT_T0.s4, 'excited']
+    ]);
+    const myHop = jump(lt, S4.count - SHOT_T0.s4, S4.count - SHOT_T0.s4 + 7 / 24, 2.0);
+    wetHalo(S4.creatorX, 865, 25, '#EFC3AE');
+    creator(S4.creatorX, 865, 25, {
       ...myMood,
-      walk: myWalk.walk,
-      dy: (myMood.dy || 0) + myWalk.dy + myHop.dy,
+      dy: (myMood.dy || 0) + myHop.dy,
       sq: (myMood.sq || 0) + myHop.sq,
-      aL: lt > tCheer ? 1.15 + 0.4 * Math.sin(t * 8 + 1) : 1.15,               // 双臂镜像同姿
-      aR: lt > tCheer ? 1.15 + 0.4 * Math.sin(t * 8 + 1) : 1.15
+      aL: 1.10, aR: 1.10
     });
 
-    // Giant Glowing "🎁 FREE 免费算力券" Floating in the center arch at y = 435!
-    boilSeed('gift_ticket');
-    const tkK = backOut(seg(lt, beatAt(dur, b.ticketIn), tGift + beatAt(dur, .036)));
-    const tkBump = 1 + 0.07 * Math.max(0, spring(lt, tCheer, 4, 14));         // 节拍②·算力券弹跳
-    const tkX = 960, tkY = 435 + Math.sin(t * 5) * 8 - 9 * Math.sin(t * 0.85);
-    push();
-    translate(tkX, tkY);
-    rotate(-0.03 + 0.02 * Math.sin(t * 4));
-    scale(tkK * tkBump);
-    glow(0, 0, 250 + 26 * Math.sin(t * 3.2), '#FFD96A', 0.9 * (0.9 + 0.1 * Math.sin(t * 2.4)));
-    paint(rrPts(-245, -108, 490, 216, 24, 2.0), {
-      wash: '#FFE47A', washOp: 255, fill: PAL.ochre, fillOp: 110, bleed: 0.15, tex: 0.5,
-      ink: PAL.ink, sw: 1.8
-    });
-    paint(rrPts(-225, -88, 450, 176, 16, 1.2), {
-      wash: '#FFFDF4', washOp: 248, ink: PAL.ink, sw: 1.1
-    });
-    paint(rrPts(-205, -70, 130, 140, 14, 1.0), {
-      wash: DINO_COLS.mint, fill: DINO_COLS.mintDk, fillOp: 80, ink: PAL.ink, sw: 1.2
-    });
-    paint(starPts(-140, 0, 44, 0.42, 5, t * 2), { wash: '#FFE47A', ink: PAL.ink, sw: 1.0 });
-    pop();
-    if (tkK > 0.3) {
-      letter('🎁 注册即送算力', tkX + 76, tkY - 32, 35, PAL.ink, { ink: false });
-      letter('免费额度 · 0套路直接开造', tkX + 76, tkY + 30, 24, '#D8394E', { ink: false });
-    }
+    // ── 小恐龙（右，像素精灵在 2D 合成层，结构上不会被任何道具压住）──
+    wetHalo(S4.dinoX, 865, 26, DINO_COLS.mint);
+    dino(S4.dinoX, 865, 26, { flip: true, aL: 1.15, aR: 1.15 });
 
-  stageLayer(4, t);                           // 第六轮 · 舱盖开启 + 三件道具依次抛出
+    stageLayer(4, t);                           // 五个道具：礼物舱 / 算力券 / 印章 / 算力机 / 计数器
     camEnd();
-    flushLetters();                                     // 场景字先落定，再盖入场遮罩
-    wipeIn(lt);                                         // 统一转场：遮罩式笔刷擦除
+    flushLetters();                             // 场景字先落定，再盖入场遮罩
+    wipeIn(lt);                                 // 统一转场：遮罩式笔刷擦除
     hudBrand(lt, SUBS.S4.title);
     storyRibbon('S4', t, lt, dur);
     wipeOut(lt, dur);
@@ -1481,7 +1442,9 @@
     { t: 12.22, w: 'card3' }, { t: 13.62, w: 'surge' },
     { t: 15.20, w: 'arrive' }, { t: 16.65, w: 'lay1' }, { t: 18.05, w: 'lay2' }, { t: 19.52, w: 'lay3' },
     { t: 21.10, w: 'build' }, { t: 22.45, w: 'show' },
-    { t: 24.15, w: 'arrive' }, { t: 25.35, w: 'hatch' }, { t: 26.35, w: 'prop1' }, { t: 27.35, w: 'prop2' }, { t: 28.25, w: 'prop3' },
+    // Act4 五个爆发帧：584 舱落台面 / 608 开盖出券 / 631 盖章 / 654 进槽口 / 677 计数跳数
+    // （原来的 'arrive' 是幕首转场事件，被 e.calm 排除 → 换成 'land' 才能拿到"预备屏息"）
+    { t: 24.15, w: 'land' }, { t: 25.35, w: 'hatch' }, { t: 26.35, w: 'prop1' }, { t: 27.35, w: 'prop2' }, { t: 28.25, w: 'prop3' },
     { t: 29.75, w: 'cal' }, { t: 30.85, w: 'stamp' }, { t: 31.95, w: 'flag' }, { t: 33.15, w: 'cell1' },
     { t: 33.55, w: 'cell4' }, { t: 34.62, w: 'cell2' }, { t: 35.25, w: 'cell5' }, { t: 36.05, w: 'cell3' },
     { t: 37.45, w: 'reset' }, { t: 38.95, w: 'board' },
@@ -1636,7 +1599,7 @@
     1: { walk: [4.12, 5.00], wx: [300, 640], ev: { pile: ['memes', 0], pile2: ['memes', 4], sweep: ['actions', 5], clean: ['idle', 6], spark: ['actions', 0], mark: ['memes', 2] } },
     2: { walk: [7.20, 8.20], wx: [1250, 980], ev: { power: ['actions', 4], card1: ['memes', 2], card2: ['memes', 8], card3: ['memes3', 5], surge: ['actions', 6] } },
     3: { walk: [15.30, 16.50], wx: [345, 720], ev: { lay1: ['memes3', 2], lay2: ['memes3', 1], lay3: ['actions', 4], build: ['memes3', 5], show: ['memes2', 0] } },
-    4: { walk: [24.45, 25.20], wx: [1560, 1200], ev: { hatch: ['memes', 7], prop1: ['memes', 8], prop2: ['actions', 6], prop3: ['memes2', 0] } },
+    4: { walk: [0, 0], wx: [S4.dinoX, S4.dinoX], ev: { land: ['memes', 7], hatch: ['memes', 8], prop1: ['memes', 2], prop2: ['memes3', 5], prop3: ['actions', 6] } },   // R12 · Act4 无走位（五个动作节拍表演）；677 用 actions/06 欢呼帧
     5: { walk: [36.15, 36.90], wx: [1160, 1440], ev: { cal: ['memes3', 6], stamp: ['memes3', 5], flag: ['memes2', 0], cell1: ['memes3', 7], cell4: ['memes3', 8], cell2: ['memes3', 5], cell5: ['memes3', 0], cell3: ['memes3', 6], reset: ['memes', 7], board: ['actions', 7], salute: ['memes3', 5] } }
   };
   function dinoActAt(t) {
@@ -1644,8 +1607,11 @@
     const A = DACT[act];
     for (const e of EV) {                                  // 事件定点：爆发后 4-10 帧定格
       const pose = A.ev[e.w]; if (!pose) continue;
-      const d = t - e.t, hold = (e.w === 'sweep' || e.w === 'surge' || e.w === 'show') ? 10 : 6;
-      if (d >= 0 && d < hold / 24) return { clip: pose[0], f: pose[1], dx: 0, scale: 1 };
+      // Act4 的 EV 拍点与爆发帧差 ±0.5 帧 → 姿态对齐到爆发帧本身，保证爆发帧上已经是新姿态
+      const ft = act === 4 ? Math.round(e.t * 24) / 24 : e.t;
+      const d = t - ft, hold = (e.w === 'sweep' || e.w === 'surge' || e.w === 'show') ? 10 : 6;
+      if (d >= 0 && d < hold / 24) return { clip: pose[0], f: pose[1], dx: pose[2] || 0, scale: 1,
+        dy: (act === 4 && e.w === 'prop3') ? jump(t, ft - 1 / 24, ft + 4 / 24, 2.4).dy * 26 : 0 };
     }
     if (t >= A.walk[0] && t < A.walk[1]) {                 // 走位：12fps 循环 + 位移（每幕 ≥160px）
       const k = (t - A.walk[0]) / (A.walk[1] - A.walk[0]);
@@ -1758,34 +1724,157 @@
       for (let i = 0; i < 3; i++) hitFX(t, 700, ys[i], 300, '#B9A48E');
       hitFX(t, 1180, 500, 420, DINO_COLS.mint);
     } else if (act === 4) {
-      // 礼物舱开盖 → 三件福利道具依次抛出并被接住（各自轨迹 + 落地挤压）
-      const hs = ['hatch', 'prop1', 'prop2', 'prop3'];
-      const he = evOf('hatch');
-      const lid = easeOutCubic(seg(t, he.t - 1.5 / 24, he.t));
-      if (t > he.t - 2 / 24) {
-        boilSeed('lid');
-        push(); translate(960 - lid * 380, 300 - lid * 210); rotate(-lid * 1.1);
-        paint(rrPts(-450, -110, 900, 220, 26, 2.2), { wash: '#8FDCC0', fill: PAL.ink, fillOp: 40, ink: PAL.ink, sw: 2.4 });
+      // ══ R12 · 因果动作链的五个道具（全部完整在画幅内，互不遮挡角色）══
+      //   ① 584 舱落台面 ② 608 开盖出券 ③ 631 盖章「已到账」 ④ 654 券进槽口 ⑤ 677 计数跳数
+      const cx = S4.cx;
+      const landAge = (t - S4.land) * 24;
+      const landed = t >= S4.land;
+      const openK = t >= S4.open;
+      const feedAge = (t - S4.feed) * 24;
+      const cntK = t >= S4.count;
+
+      // ── 台座（礼台）：顶面 800，宽 460，完整在安全边内 ──
+      boilSeed('s4_plinth');
+      paint(ellPts(cx, 864, 296, 24, 24, 1.2), { wash: '#6E9F58', washOp: 66, ink: null });
+      paint(rrPts(cx - 230, 806, 460, 58, 14), { wash: '#C9A46B', fill: '#8A6B44', fillOp: 58, tex: 0.4, ink: PAL.ink, sw: 1.6 });
+      paint(rrPts(cx - 210, 798, 420, 26, 9), { wash: '#EBD7AE', fill: '#C9A46B', fillOp: 52, ink: PAL.ink, sw: 1.4 });
+      if (!landed) paint(ellPts(cx, 800, 116, 13, 18, 1.0), { wash: '#6E9F58', washOp: 54, ink: null });
+
+      // ── ① 礼物舱：悬停 → 584 帧单帧落台，落地挤压 3 帧 ──
+      const sq = landed ? Math.max(0, 1 - landAge / 3) : 0;
+      const yb = landed ? S4.plinthTop : 556 + Math.sin(warpT(t) * 1.1) * 4;
+      push();
+      translate(cx, yb);
+      scale(1 + 0.10 * sq, 1 - 0.12 * sq);
+      const wob = openK ? Math.max(0, Math.exp(-(t - S4.open) * 8) * Math.sin((t - S4.open) * 26)) * 0.16 : 0;
+      if (openK) {                                  // 掀盖：两瓣盖向后外翻（先画 → 压在舱体之下，读作"掀开的盖"而不是"手臂"）
+        push(); translate(-175, -220); rotate(2.62 + wob);
+        paint(rrPts(0, -88, 175, 88, 42), { wash: '#A9DCCB', fill: '#5FAE92', fillOp: 45, tex: 0.45, ink: PAL.ink, sw: 1.6 });
         pop();
-      }
-      const props = [['#FFD95A', '算力券'], ['#9BE0C5', '教程卡'], ['#FFB3C7', '额度礼包']];
-      for (let i = 0; i < 3; i++) {
-        const e = evOf(hs[i + 1]), a = t - e.t;
-        if (a < -1.5 / 24 || a > 1.4) continue;
-        const k = easeOutCubic(seg(t, e.t - 1.5 / 24, e.t));
-        const tx = lerp(960, 400 + i * 560, k), ty = lerp(430, 760 - (i % 2) * 40, k) - Math.sin(clamp(k) * Math.PI) * 150;
-        const sq = Math.max(0, 1 - Math.max(0, a) * 6);
-        boilSeed('prop' + i);
-        push(); translate(tx, ty); rotate((1 - k) * 0.9);
-        scale((1 + 0.22 * sq) * (0.55 + 0.45 * k), (1 - 0.2 * sq) * (0.55 + 0.45 * k));
-        paint(rrPts(-170, -128, 340, 256, 26, 2.0), { wash: props[i][0], fill: PAL.ink, fillOp: 30, ink: PAL.ink, sw: 2.4 });
+        push(); translate(175, -220); rotate(-2.62 - wob);
+        paint(rrPts(-175, -88, 175, 88, 42), { wash: '#A9DCCB', fill: '#5FAE92', fillOp: 45, tex: 0.45, ink: PAL.ink, sw: 1.6 });
         pop();
-        letter(props[i][1], tx, ty, 44, PAL.ink, { alpha: k });
-        hitFX(t, tx, ty, 260, props[i][0]);
+        paint(rrPts(-175, -220, 350, 220, 80), { wash: '#BFE8DA', fill: '#6FBFA0', fillOp: 50, bleed: 0.1, tex: 0.45, ink: PAL.ink, sw: 2.0 });
+        paint(ellPts(0, -220, 152, 26, 24, 1.0), { wash: '#2B2233', washOp: 225, ink: PAL.ink, sw: 1.4 });
+      } else {                                      // 合盖：一整枚胶囊剪影（不是两只枕头）
+        paint(rrPts(-175, -330, 350, 330, 108), { wash: '#BFE8DA', fill: '#6FBFA0', fillOp: 48, bleed: 0.1, tex: 0.45, ink: PAL.ink, sw: 2.0 });
+        paint(rrPts(-175, -240, 350, 22, 9), { wash: '#8FD3BB', washOp: 205, ink: PAL.ink, sw: 1.3 });
       }
-      slamBlock(t, 'arrive', 960, 620, 660, 150, DINO_COLS.mintLt, '第三件 · 注册即送算力福利', 46, -0.03);
-      for (let i = 0; i < 3; i++) slamBlock(t, 'prop' + (i + 1), 960, 196 + i * 76, 1000, 132, props[i][0], props[i][1] + ' · 已到账', 44, i % 2 ? 0.04 : -0.04);
-      hitFX(t, 960, 350, 380, DINO_COLS.mint);
+      const ribTop = openK ? -214 : -318;
+      paint(rrPts(-24, ribTop, 48, -ribTop, 6), { wash: '#FFD95A', washOp: 165, ink: null });
+      paint(starPts(0, -104, 44, 0.42, 5, 0.2), { wash: '#FFF3C4', fill: PAL.ochre, fillOp: 78, ink: PAL.ink, sw: 1.2 });
+      pop();
+
+      // 落地余波：台面冲击环 + 6 团尘（≤8 帧）
+      s4Ring(t, S4.landF, cx, S4.plinthTop, 190, '#EBD7AE', 7, 0.30);
+      if (landAge >= 0 && landAge < 8) {
+        const dk = 1 - landAge / 8;
+        for (let i = 0; i < 6; i++) {
+          const ang = Math.PI * (1.06 + i * 0.146), rr = 150 + 130 * easeOut(1 - dk);
+          paint(ellPts(cx + Math.cos(ang) * rr, S4.plinthTop + 6 + Math.sin(ang) * 12 - 26 * (1 - dk),
+            22 + 14 * (1 - dk), 16 + 10 * (1 - dk), 12, 1.4), { wash: '#E8D9BC', washOp: 190 * dk, ink: null });
+        }
+      }
+
+      // ── ② 算力券（全片唯一焦点物，490px = 25.5% 画幅；654 帧单帧飞进槽口）──
+      if (openK && feedAge < 3) {
+        const fly = feedAge >= 0 ? 1 : 0;                       // 654 帧单帧位移：券已经在槽口里
+        const tSc = lerp(1, 0.38, fly);
+        const tx = lerp(cx, 1600, fly), ty = lerp(S4.ty + Math.sin(warpT(t) * 1.4) * 6, S4.slotY + 2, fly);
+        const tRot = lerp(-0.02 + Math.sin(warpT(t) * 0.9) * 0.012, 0.22, fly);
+        const popIn = 1 + 0.10 * Math.max(0, 1 - (t - S4.open) * 10);
+        const sSq = t >= S4.stamp ? Math.max(0, 1 - (t - S4.stamp) * 12) : 0;
+        boilSeed('s4_ticket');
+        push();
+        translate(tx, ty);
+        rotate(tRot);
+        scale(tSc * popIn * (1 + 0.05 * sSq), tSc * popIn * (1 - 0.09 * sSq));
+        glow(0, 0, 250, '#FFD96A', 0.50);
+        paint(rrPts(-245, -125, 490, 250, 24, 2.0), { wash: '#FFE47A', fill: PAL.ochre, fillOp: 88, bleed: 0.12, tex: 0.45, ink: PAL.ink, sw: 2.2 });
+        paint(rrPts(-222, -102, 444, 204, 14, 1.2), { wash: '#FFFDF4', washOp: 248, ink: PAL.ink, sw: 1.1 });
+        paint(rrPts(-206, -86, 96, 172, 12, 1.0), { wash: DINO_COLS.mint, fill: DINO_COLS.mintDk, fillOp: 70, ink: PAL.ink, sw: 1.2 });
+        paint(starPts(-158, 0, 34, 0.42, 5, 0.2), { wash: '#FFE47A', ink: PAL.ink, sw: 1.0 });
+        pop();
+        if (fly < 0.55) {
+          letter('算力券', tx - 10, ty - 72, 42, PAL.ink, { alpha: 1 - fly * 1.8 });
+          letter('免费额度 · 0 套路', tx - 10, ty - 30, 23, '#D8394E', { alpha: 1 - fly * 1.8 });
+        }
+      }
+      // 券上「已到账」钢印（631 帧后 2 帧落定）
+      if (t >= S4.stamp && feedAge < 0) {
+        const mk = easeOutCubic(clamp((t - S4.stamp) * 24 / 1.5 + 0.45));   // 冲击帧就有 83% 钢印，2 帧内落定
+        letter('已到账', cx + 130, 500, 34, '#C0322F', { rot: -0.10, alpha: mk });
+      }
+
+      // ── ③ 印章：618 帧落入画面停在券上方（预备），631 帧单帧砸下，634–642 抬起淡出 ──
+      const stAge = (t - S4.stamp) * 24;
+      if (t >= 618 / 24 && stAge < 16) {
+        const drop = easeOutCubic(clamp((t - 618 / 24) * 24 / 4));
+        const slam = stAge >= 0 ? 1 : 0;                       // 631 帧单帧砸下（爆发帧就是落定帧）
+        const lift = stAge > 3 ? easeOutCubic(clamp((stAge - 3) / 8)) : 0;
+        const yFace = lerp(lerp(90, 286, drop), 500, slam) - 250 * lift;   // 抬起位 286 → 券顶之上留 20px 空隙
+        const aSt = 1 - seg(stAge, 11, 16);
+        boilSeed('s4_stamp');
+        push();
+        translate(cx + 130, yFace);
+        rotate(lerp(-0.26, -0.02, drop) + 0.015 * Math.sin(t * 3));
+        paint(rrPts(-65, -120, 130, 120, 13), { wash: '#C96A4E', fill: '#8A3F2C', fillOp: 66, ink: PAL.ink, sw: 2.0 });
+        paint(rrPts(-65, -28, 130, 28, 7), { wash: '#7A2E20', ink: PAL.ink, sw: 1.6 });
+        paint(rrPts(-23, -176, 46, 62, 11), { wash: '#D98A6A', fill: '#8A3F2C', fillOp: 55, ink: PAL.ink, sw: 1.8 });
+        pop();
+        if (aSt > 0.02) letter('ANS', cx + 130, yFace - 66, 24, PAL.cream, { alpha: aSt, rot: -0.04 });
+      }
+      // 盖章冲击：墨点溅开（≤8 帧）
+      if (stAge >= 0 && stAge < 8) {
+        const ik = 1 - stAge / 8;
+        boilSeed('s4_ink');
+        for (let i = 0; i < 9; i++) {                       // 墨点：大小/距离/角度都不规则，像真的溅开
+          const ang = (i / 9) * TAU + 0.34 + hash(i * 7) * 0.35;
+          const rr = (50 + 140 * easeOut(1 - ik)) * (0.45 + hash(i * 11) * 0.95);
+          paint(ellPts(cx + 130 + Math.cos(ang) * rr, 500 + Math.sin(ang) * rr * 0.58,
+            5 + 12 * ik * hash(i * 3), 4 + 9 * ik * hash(i * 5), 10, 1.2), { wash: '#C0322F', washOp: 225 * ik, ink: null });
+        }
+        for (let i = 0; i < 4; i++) {                       // 4 道短墨丝（只到 130px，不横扫全幅）
+          const ang = -0.9 + i * 0.62, l0 = 60 + 34 * easeOut(1 - ik);
+          paint([[cx + 130 + Math.cos(ang) * l0, 500 + Math.sin(ang) * l0 * 0.6],
+                 [cx + 130 + Math.cos(ang) * (l0 + 56 * ik), 500 + Math.sin(ang) * (l0 + 56 * ik) * 0.6]],
+            { wash: '#C0322F', washOp: 190 * ik, ink: null });
+        }
+      }
+
+      // ── ④ 算力机（右，1620..1830 完整在安全边内；槽口在左缘，不遮角色）──
+      const litK = t >= S4.feed ? 1 : 0;
+      const pulse = litK ? 0.5 + 0.5 * Math.sin(feedAge * 0.9) : 0;
+      boilSeed('s4_machine');
+      paint(rrPts(S4.mx - 6, S4.my, S4.mw + 12, S4.mh, 28), { wash: '#3A4160', fill: '#232840', fillOp: 66, tex: 0.4, ink: PAL.ink, sw: 2.2 });
+      paint(rrPts(S4.mx + 14, S4.my + 24, 166, 120, 14), { wash: '#1A1720', washOp: 235, ink: PAL.ink, sw: 1.4 });
+      for (let i = 0; i < 4; i++) paint(rectPts(S4.mx + 28, S4.my + 44 + i * 24, 138 - i * 12, 6, 3), { wash: DINO_COLS.mint, washOp: 70, ink: null });
+      paint(ellPts(S4.mx + S4.mw / 2, S4.my - 14, 26, 12, 12, 1.0), { wash: '#FFE082', ink: PAL.ink, sw: 1.2 });
+      glow(S4.mx + S4.mw / 2, S4.my - 14, 90, '#FFD96A', 0.5 + 0.16 * pulseF(t));
+      // 槽口：一条横向进券缝（左缘开口朝向券的来向），亮起时缝内是薄荷光
+      paint(rrPts(S4.mx - 18, S4.slotY - 16, 86, 32, 12), { wash: '#161320', washOp: 245, ink: PAL.ink, sw: 1.6 });
+      paint(rrPts(S4.mx - 10, S4.slotY - 6, 78, 12, 6), { wash: litK ? DINO_COLS.mint : '#5A5470', washOp: litK ? 235 : 140, ink: null });
+      if (litK) glow(S4.mx + 8, S4.slotY, 150, '#9BE0C5', 0.55 + 0.35 * pulse);
+      // 机座
+      paint(rrPts(S4.mx - 14, 842, S4.mw + 28, 24, 9), { wash: '#2B2233', fill: '#1A1720', fillOp: 60, ink: PAL.ink, sw: 1.6 });
+      // 计数器面板（跳数瞬间整块面板亮一记薄荷色 —— 只发生在面板内，不是全屏白闪）
+      paint(rrPts(S4.mx + 16, 640, 178, 120, 12), { wash: '#FFFDF4', washOp: 246, fill: '#EFE3C6', fillOp: 60, ink: PAL.ink, sw: 1.6 });
+      const cFlash = cntK ? Math.max(0, 1 - (t - S4.count) * 16) : 0;
+      if (cFlash > 0.02) paint(rrPts(S4.mx + 20, 644, 170, 112, 10), { wash: DINO_COLS.mint, washOp: 210 * cFlash, ink: null });
+      const cPop = cntK ? 1 + 0.24 * Math.max(0, 1 - (t - S4.count) * 14) : 1;
+      letter(cntK ? '1000' : '100', S4.mx + 105, 690, 44 * cPop, cntK ? '#1F7A5C' : PAL.ink, { ink: false });
+      letter('算力额度', S4.mx + 105, 740, 18, PAL.ink, { ink: false, alpha: 0.85 });
+      // 跳数冲击：计数环 + 8 颗星（≤0.6s）
+      s4Ring(t, S4.countF, S4.mx + 105, 700, 178, '#9BE0C5', 8, 0.62);
+      if (cntK && (t - S4.count) < 0.6) {
+        const sk = (t - S4.count) / 0.6;
+        boilSeed('s4_countstars');
+        for (let i = 0; i < 9; i++) {
+          const ang = -Math.PI * 0.92 + i * 0.20, rr = 110 + 200 * easeOut(sk);
+          paint(starPts(S4.mx + 105 + Math.cos(ang) * rr, 700 + Math.sin(ang) * rr * 0.82,
+            10 + 12 * (1 - sk), 0.34, 4, ang + sk * 2), { wash: '#FFD96A', washOp: 245 * (1 - sk * sk), ink: null });
+        }
+      }
     } else if (act === 5) {
       // 日历逐格盖章（3 次）→ 已有的插旗 / Full Reset / 宣誓
       const cs = ['cell1', 'cell4', 'cell2', 'cell5', 'cell3'];
