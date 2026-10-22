@@ -59,64 +59,85 @@ function distinctFlowerPts(cx, cy, r, petals = 5, rot = 0, squashY = 0.92, j = 0
   return pts;
 }
 
+// 单点形变（连续、无取整）：① 髋线以下的腿绕髋关节按"大腿角"旋转（权重沿腿长 ease 到 1、裆部中线为 0，
+// 所以轮廓仍是一条连续样条，不会出现折角）② 头部绕颈点刚性微倾（下巴线以上整块一起转，眼嘴永远贴合头形）
+// ③ 脚底抵消身体起伏（脚踩地不动、腿自然伸缩）。
+function dinoDeformPt(px, py, G) {
+  let x = px, y = py;
+  const wFoot = ease(clamp((py + 2.20) / 2.20));
+  y -= G.bobU * wFoot;                                   // ③
+  const legW = wFoot * ease(clamp((Math.abs(px) - 0.30) / 1.10));
+  if (legW > 1e-4) {                                     // ①
+    const side = px >= 0 ? 1 : -1;
+    const th = (side > 0 ? G.thR : G.thL) * legW;
+    const lf = (side > 0 ? G.liftR : G.liftL) * legW;
+    const pvx = side * 2.60, pvy = -2.20, dx = x - pvx, dy = y - pvy;
+    const c = Math.cos(th), s = Math.sin(th);
+    x = pvx + dx * c - dy * s;
+    y = pvy + dx * s + dy * c - lf;
+  }
+  const headW = ease(clamp((-5.55 - py) / 0.85));
+  if (headW > 1e-4 && G.head) {                          // ②
+    const a = G.head * headW, pvy = -6.00, dx = x, dy = y - pvy;
+    const c = Math.cos(a), s = Math.sin(a);
+    x = dx * c - dy * s;
+    y = pvy + dx * s + dy * c;
+  }
+  return [x, y];
+}
+
 // Wide, Chubby, Short-Legged Standing Baby-Dino Silhouette (保持好形状，整体加宽变胖、缩短腿长：
 // 宽圆饱满的大脑袋与婴儿肥脸颊 rx=4.88u -> 宽厚圆滚滚的胖身体 rx=4.82u -> 短粗圆润有弧度的小胖短腿！)
-function curvyStandingDinoPts(u, vName, walk, J) {
-  const isSide = vName === 'side';
-  const wScale = isSide ? 0.88 : 1.0;
-  let liftL = 0, liftR = 0, shiftL = 0, shiftR = 0;
-  if (walk != null) {
-    const phL = walk * TAU, phR = (walk + 0.5) * TAU;
-    shiftL = Math.sin(phL) * 0.32;
-    liftL  = -Math.max(0, Math.cos(phL)) * 0.45;
-    shiftR = Math.sin(phR) * 0.32;
-    liftR  = -Math.max(0, Math.cos(phR)) * 0.45;
-  }
-
+// R13：几何常量一个都没动（V4.6 冻结），只是把腿/头的形变交给 dinoDeformPt 参数化。
+function curvyStandingDinoPts(u, vName, G, J) {
+  const wScale = vName === 'side' ? 0.88 : 1.0;
   const raw = [
     // Wide, round cute baby-head dome (圆润宽阔的大脑门)
     [ 0.00, -10.35],
-    [ 2.58 * wScale, -10.05],
-    [ 4.25 * wScale, -8.95],
+    [ 2.58, -10.05],
+    [ 4.25, -8.95],
     // Full, wide marshmallow baby cheeks (饱满宽胖脸颊 rx=4.88u)
-    [ 4.86 * wScale, -7.45],
-    [ 4.88 * wScale, -6.05],
+    [ 4.86, -7.45],
+    [ 4.88, -6.05],
     // Wide, chubby round torso (身体大幅加宽 rx=4.82u，告别偏瘦感！)
-    [ 4.82 * wScale, -4.65],
-    [ 4.72 * wScale, -3.28],
+    [ 4.82, -4.65],
+    [ 4.72, -3.28],
     // Plump lower hip rounding into SHORT, curvy chubby legs (缩短腿长，保留圆润小鸡腿弧度！)
-    [(4.22 + shiftR * 0.3) * wScale, -2.18 + liftR * 0.25],
-    [(3.48 + shiftR * 0.6) * wScale, -1.35 + liftR * 0.55],
+    [ 4.22, -2.18],
+    [ 3.48, -1.35],
     // Low chubby ankle taper (短腿脚踝微收弧度)
-    [(2.68 + shiftR) * wScale, -0.82 + liftR],
+    [ 2.68, -0.82],
     // Wide, plump rounded standing paw (宽乎乎的圆润小肉脚掌)
-    [(2.95 + shiftR) * wScale, -0.36 + liftR],
-    [(2.62 + shiftR) * wScale,  0.06 + liftR],
-    [(1.42 + shiftR) * wScale,  0.06 + liftR],
-    [(0.96 + shiftR) * wScale, -0.28 + liftR],
-    // Short inner right leg curving up to the low, chubby under-belly arch (-1.08u instead of -1.78u so legs are cute & short!)
-    [(0.92 + shiftR * 0.5) * wScale, -0.82 + liftR * 0.5],
+    [ 2.95, -0.36],
+    [ 2.62,  0.06],
+    [ 1.42,  0.06],
+    [ 0.96, -0.28],
+    // Short inner right leg curving up to the low, chubby under-belly arch (-1.12u)
+    [ 0.92, -0.82],
     [ 0.00, -1.12],
     // Short inner left leg curving down to the left foot
-    [(-0.92 + shiftL * 0.5) * wScale, -0.82 + liftL * 0.5],
-    [(-0.96 + shiftL) * wScale, -0.28 + liftL],
-    [(-1.42 + shiftL) * wScale,  0.06 + liftL],
-    [(-2.62 + shiftL) * wScale,  0.06 + liftL],
-    [(-2.95 + shiftL) * wScale, -0.36 + liftL],
+    [-0.92, -0.82],
+    [-0.96, -0.28],
+    [-1.42,  0.06],
+    [-2.62,  0.06],
+    [-2.95, -0.36],
     // Left low chubby ankle taper
-    [(-2.68 + shiftL) * wScale, -0.82 + liftL],
+    [-2.68, -0.82],
     // Left short, curvy outer leg & hip
-    [(-3.48 + shiftL * 0.6) * wScale, -1.35 + liftL * 0.55],
-    [(-4.22 + shiftL * 0.3) * wScale, -2.18 + liftL * 0.25],
+    [-3.48, -1.35],
+    [-4.22, -2.18],
     // Wide, chubby left torso & cheek
-    [-4.72 * wScale, -3.28],
-    [-4.82 * wScale, -4.65],
-    [-4.88 * wScale, -6.05],
-    [-4.86 * wScale, -7.45],
-    [-4.25 * wScale, -8.95],
-    [-2.58 * wScale, -10.05]
+    [-4.72, -3.28],
+    [-4.82, -4.65],
+    [-4.88, -6.05],
+    [-4.86, -7.45],
+    [-4.25, -8.95],
+    [-2.58, -10.05]
   ];
-  return raw.map(([px, py]) => [px * u + jit(J * 0.2), py * u + jit(J * 0.2)]);
+  return raw.map(([px, py]) => {
+    const q = dinoDeformPt(px, py, G);
+    return [q[0] * wScale * u + jit(J * 0.2), q[1] * u + jit(J * 0.2)];
+  });
 }
 
 // Open arc points (for seamless head bumps and seamless curvy arms!)
@@ -157,50 +178,142 @@ function creatorFacePts(u, vName, J) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 第八轮 · 像素 IP 版小恐龙（assets/dino2 · 55 张 RGBA 精灵）
-//   红线：整数倍缩放（1×-3×）+ 最近邻（noSmooth）、不做非等比拉伸（挤压只用整体缩放 + 位移）、
-//   不加运动模糊。形象比例锁由素材本身保证（不重绘、不改比例、不重新描边）。
-//   场景侧通过 setDinoAct(fn) 注入 {clip, f, dx, scale}；素材未加载时自动退回下面的程序化造型。
+// R13 · 小恐龙 = 纯代码程序化绘制（唯一绘制路径；全片禁止引用 assets/dino2 精灵）
+//   · 连续步态：相位 w = 位移积分 / 步幅，由 t 直接算出。24fps 每帧都在变，
+//     全程不做 Math.round、不按帧取整、不贴图 → 结构上不可能"一帧一帧拼"
+//   · 表情系统：expr 派生 6 种眼 × 5 种嘴 × 附加物，全部共用同一套头身几何
+//   · 待机：呼吸（±1.5% / 2.4s）+ 眨眼（3–5s 一次、3 帧闭合、ease）+ 偶尔歪头
 // ══════════════════════════════════════════════════════════════════════════════
-const DINO2 = { walk: [], idle: [], actions: [], memes: [], memes2: [], memes3: [], standup: [] };
-const DINO2_N = { walk: 8, idle: 8, actions: 8, memes: 9, memes2: 9, memes3: 9, standup: 4 };
-let DINO2_OK = false, DINO_ACT_FN = null;
-const setDinoAct = fn => { DINO_ACT_FN = fn; };
-function preloadDino2() {
-  const jobs = [];
-  for (const c in DINO2_N) {
-    DINO2[c] = new Array(DINO2_N[c]);
-    for (let i = 1; i <= DINO2_N[c]; i++) {
-      const idx = i - 1, name = 'assets/dino2/' + c + '/' + (i < 10 ? '0' + i : '' + i) + '.png';
-      jobs.push(new Promise(res => loadImage(name, im => { DINO2[c][idx] = im; res(1); }, () => res(0))));
+const DINO_INK = '#1B2559';                    // 形象规范描边色（只作用于小恐龙，不改全局 PAL.ink）
+const DINO_GAIT = {
+  THIGH: 18 * Math.PI / 180,                   // 大腿摆幅 ±18°
+  BOB: 3,                                      // 身体起伏 ±3px（u=24 基准，随 u 等比缩放）
+  ARM: 0.34,                                   // 手臂反相摆幅（aL/aR 单位）
+  TAIL: 0.20,                                  // 尾巴左右摆幅（u）
+  TAIL_LAG: 0.15,                              // 尾巴滞后相位（周期比例）
+  HEAD: 1.7 * Math.PI / 180,                   // 头部微倾 ±1.7°
+  LIFT: 0.30,                                  // 抬脚高度（u，≈腿长 14%）
+  BREATH: 2.4,                                 // 呼吸周期（s）
+  BLINK: [3, 5]                                // 眨眼间隔区间（s）
+};
+
+// 一条腿的摆动：w 在 [0,.5] 前摆、[.5,1] 支撑；ease() 让两个极值处速度为 0（脚落地不滑），
+// 且极值两侧导数同为 0 → 跨半周期 C1 连续，24fps 采样不会出现顿帧。
+const dinoLegSwing = w => { const f = frac(w) * 2; return f < 1 ? -1 + 2 * ease(f) : 1 - 2 * ease(f - 1); };
+
+// 一个完整周期（= 两倍步幅）的全部步态量。全部是 w 的连续函数，amp 是"走↔停"的连续权重。
+function dinoGait(w, amp = 1) {
+  const f = frac(w), s = Math.sin(TAU * f);
+  return {
+    thL: DINO_GAIT.THIGH * amp * dinoLegSwing(f),                 // 左腿大腿角（±18°）
+    thR: DINO_GAIT.THIGH * amp * dinoLegSwing(f + 0.5),           // 右腿（反相）
+    liftL: DINO_GAIT.LIFT * amp * Math.pow(Math.max(0, s), 1.5),  // 摆动腿抬起
+    liftR: DINO_GAIT.LIFT * amp * Math.pow(Math.max(0, -s), 1.5),
+    bob: -DINO_GAIT.BOB * amp * Math.sin(TAU * 2 * f),            // 身体起伏 ±3px，2 倍频
+    arm: DINO_GAIT.ARM * amp * s,                                 // 手臂反相摆动
+    tail: DINO_GAIT.TAIL * amp * Math.sin(TAU * (f - DINO_GAIT.TAIL_LAG)),  // 尾巴滞后 0.15 相位
+    head: DINO_GAIT.HEAD * amp * Math.sin(TAU * f)                // 头部微倾（同频、幅度更小）
+  };
+}
+
+// 待机 · 偶尔歪头：每 6.0–8.6s 一次，1.5s 内 ease 歪过去再回来（纯函数，帧间连续）
+function dinoIdleTilt(t, seed = 0) {
+  const P = 6.0 + 2.6 * hash(seed * 3.7 + 1.3), n = Math.floor(t / P), ph = t - n * P;
+  const on = 0.35 + 0.45 * hash(n * 1.7 + seed * 0.7), dur = 1.5;
+  const k = seg(ph, on, on + 0.26) * (1 - seg(ph, on + dur - 0.26, on + dur));
+  return (hash(n * 5.1 + seed * 2.3) > 0.5 ? 1 : -1) * ease(k) * 0.055;
+}
+// 待机 · 眨眼：每 3–5s 一次，闭合窗 4 帧（其中 3 帧可见闭合），边缘 ease（不突然出现/消失）
+function dinoBlinkAt(t, seed = 0) {
+  const P = DINO_GAIT.BLINK[0] + (DINO_GAIT.BLINK[1] - DINO_GAIT.BLINK[0]) * hash(seed * 7.3 + 2.1);
+  const D = 4 / 24, bt = frac((t + 0.37 * seed) / P) * P;
+  if (bt >= D) return 0;
+  return ease(Math.min(1, bt / (1.2 / 24)) * Math.min(1, (D - bt) / (1.2 / 24)));
+}
+
+// 表情表：expr → 眼 / 嘴 / 附加物 / 腮红 / 嘴部缩放。所有表情共用同一套头身几何，只换这几项。
+const DINO_EXPR = {
+  neutral: { eyes: 'dot',    mouth: 'smile', blush: 0.68, ms: 1.00 },
+  happy:   { eyes: 'happy',  mouth: 'smile', blush: 0.80, ms: 1.02 },
+  laugh:   { eyes: 'happy',  mouth: 'laugh', blush: 0.92, ms: 1.18 },
+  cry:     { eyes: 'cry',    mouth: 'wail',  blush: 0.55, ms: 1.06, tears: 1 },
+  shock:   { eyes: 'wide',   mouth: 'O',     blush: 0.42, ms: 1.12, sweat: 1 },
+  daze:    { eyes: 'narrow', mouth: 'flat',  blush: 0.50, ms: 1.00, sweat: 0.55 },
+  dizzy:   { eyes: 'swirl',  mouth: 'o',     blush: 0.55, ms: 1.00 },
+  stone:   { eyes: 'stone',  mouth: 'flat',  blush: 0.00, ms: 1.00, grey: 1 },
+  smug:    { eyes: 'narrow', mouth: 'flat',  blush: 0.62, ms: 1.00, tilt: 0.05 },
+  heart:   { eyes: 'dot',    mouth: 'smile', blush: 1.00, ms: 1.02, hearts: 1 },
+  popcorn: { eyes: 'dot',    mouth: 'o',     blush: 0.72, ms: 1.00, popcorn: 1 },
+  angry:   { eyes: 'narrow', mouth: 'flat',  blush: 0.45, ms: 1.00, anger: 1 }
+};
+
+// 爆米花道具：纸桶 + 三颗爆米花（画在手臂末端，armL/armR 钩子坐标）
+function dinoPopcornProp(u, sw, armAng = 0) {
+  const ink = DINO_INK;
+  push();
+  rotate(-armAng);                       // 抵消手臂倾角 → 纸桶始终直立
+  translate(0, 0.55 * u);
+  paint(rrPts(-0.86 * u, -1.72 * u, 1.72 * u, 1.86 * u, 0.18 * u), { wash: '#FFFDF6', ink: ink, sw: sw * 0.85 });
+  for (const i of [-1, 1]) paint(rectPts(i * 0.58 * u - 0.14 * u, -1.68 * u, 0.28 * u, 1.78 * u, 0.5), { wash: '#E0483C', ink: null });
+  paint(rectPts(-0.86 * u, -1.72 * u, 1.72 * u, 0.30 * u, 0.6), { wash: '#E0483C', ink: null });
+  for (const [px, py, r] of [[-0.50, -1.92, 0.42], [0.02, -2.12, 0.48], [0.54, -1.86, 0.38]])
+    paint(ellPts(px * u, py * u, r * u, r * u * 0.92, 12), { wash: '#FFF1C9', ink: ink, sw: sw * 0.55 });
+  pop();
+}
+
+// 表情附加物：泪 / 汗滴 / 怒气十字 / 爱心 —— 全部参数化矢量，不用贴图
+function dinoExtras(u, o) {
+  const ink = o.ink || DINO_INK, sw = o.sw || 1, EX = o.EX || {};
+  if (EX.tears) {                                            // 爆哭：两道泪流 + 甩出的泪珠
+    for (const s of o.sides) {
+      const P = [];
+      for (let i = 0; i <= 6; i++) {
+        const k = i / 6;
+        P.push([s * (1.95 + 0.78 * k - 0.30 * k * k) * u + Math.sin(T * 9 + i * 1.2) * 0.05 * u, (-7.15 + 2.45 * k) * u]);
+      }
+      paint(ribbon(P, 0.22 * u, 0.52 * u), { wash: PAL.sky, washOp: 225, fill: '#FFFFFF', fillOp: 55, ink: ink, sw: sw * 0.45 });
+      for (let i = 0; i < 3; i++) {
+        const ph = frac(T * 1.6 + i / 3 + (s > 0 ? 0.45 : 0));
+        paint(ellPts(s * (2.55 + ph * 1.9) * u, (-6.35 + ph * 3.2) * u,
+          0.15 * u * (1 - ph * 0.4), 0.21 * u * (1 - ph * 0.4), 8), { wash: PAL.sky, ink: ink, sw: sw * 0.35 });
+      }
     }
   }
-  return Promise.all(jobs).then(r => { DINO2_OK = r.every(Boolean); return DINO2_OK; });
-}
-// 底部中心锚点 + 整数位置 + 整数倍缩放 + 最近邻；湿边由场景侧 wetHalo 负责
-function dinoSprite(x, y, st, u) {
-  const c = st.clip || 'idle', arr = DINO2[c] || DINO2.idle;
-  if (!arr || !arr.length) return false;
-  const img = arr[Math.abs(Math.round(st.f || 0)) % arr.length];
-  if (!img || !img.width) return false;
-  const k = Math.max(1, Math.min(3, Math.round(st.scale || 1)));
-  const w = img.width * k, h = img.height * k;
-  const q4 = v => Math.round(v * 4) / 4;                     // 0.25px 网格：相机运动时亚像素平滑，像素仍锐利
-  const X = q4(x + (st.dx || 0)), Y = q4(y + (st.dy || 0));
-  // 柔和投影（同类色 0.15）：画在世界层，精灵在其上 → 像素坐在湿色里
-  paint(ellPts(X + 4, Y + 5, w * 0.30, 16, 14), { wash: DINO_COLS.mintDk, washOp: 38, ink: null });
-  sprite(img, X, Y, w, h);                          // 底部中心锚点，最近邻，整数倍
-  return true;
+  if (EX.sweat) {                                            // 汗滴（太阳穴，轻微上下浮）
+    const k = EX.sweat, bx = 3.95 * u, by = (-8.45 + 0.20 * Math.sin(T * 3.2)) * u;
+    paint([[bx, by - 0.92 * u * k], [bx + 0.42 * u * k, by + 0.14 * u], [bx + 0.34 * u * k, by + 0.62 * u],
+           [bx, by + 0.82 * u], [bx - 0.34 * u * k, by + 0.62 * u], [bx - 0.42 * u * k, by + 0.14 * u]],
+      { wash: PAL.sky, fill: '#FFFFFF', fillOp: 80, ink: ink, sw: sw * 0.62, curv: 0.45 });
+    paint(ellPts(bx - 0.13 * u * k, by + 0.30 * u, 0.11 * u * k, 0.17 * u, 8), { wash: PAL.cream, ink: null });
+  }
+  if (EX.anger) {                                            // 怒气十字（头顶右，抖动）
+    push();
+    translate(3.55 * u, -10.10 * u);
+    rotate(0.18 * Math.sin(T * 14));
+    for (const a of [0.785, -0.785]) {
+      push(); rotate(a);
+      paint(rrPts(-0.62 * u, -0.13 * u, 1.24 * u, 0.26 * u, 0.13 * u), { wash: '#E23E36', ink: ink, sw: sw * 0.4 });
+      pop();
+    }
+    pop();
+  }
+  if (EX.hearts) {                                           // 爱心：三颗上浮（比心 / 福利）
+    for (let i = 0; i < 3; i++) {
+      const ph = frac(T * 0.55 + i / 3), a = Math.sin(ph * Math.PI);
+      if (a < 0.15) continue;
+      paint(heartPts((2.6 + 1.5 * Math.sin(ph * 4.2 + i)) * u, (-11.3 - 2.6 * ph) * u, 0.52 * u * a, 18),
+        { wash: '#E2476E', fill: '#FF8FA3', fillOp: 70, ink: ink, sw: sw * 0.5 });
+    }
+  }
 }
 
 // ---------- 1. WIDE, CHUBBY, SHORT-LEGGED STANDING ANS LITTLE DINO (宽胖圆润 + 短粗有弧度小胖腿) ----------
+// o.expr  : 'neutral'|'happy'|'laugh'|'cry'|'shock'|'daze'|'dizzy'|'stone'|'smug'|'heart'|'popcorn'|'angry'
+// o.walk  : 连续相位 0..1（null = 待机）；o.walkAmp: 0..1 走↔停的连续权重（场景侧 4 帧缓入缓出）
+// o.blink : 0..1（不传则按 3–5s 自动眨眼）
 function dino(x, y, u, o = {}) {
-  if (DINO2_OK && DINO_ACT_FN) {                    // 像素精灵优先
-    const st = DINO_ACT_FN(T);
-    if (st && dinoSprite(x, y, st, u)) return;      // 未加载/取帧失败则继续走程序化造型
-  }
   const id = o.boilKey ?? ('dino_' + (++CLAWD_N));
-  const rs = part => boilSeed(`${id}_${part}`);
+  const rs = part => boilSeed(id + '_' + part);
   x += (o.dx || 0) * u;
   const vName = o.view || 'front';
   const V = VIEWS[vName] || VIEWS.front;
@@ -209,12 +322,29 @@ function dino(x, y, u, o = {}) {
   const sm = clamp(o.smear || 0);
   const sw = clamp(u / 14, 0.5, 2.3) * (o.swMul || 1);
   const J = u * 0.032;
+  const INK = o.inkCol || DINO_INK;
+  const seed = o.seed || 0;
 
-  const col = o.dinoCol || DINO_COLS.mint;
-  const dk = o.dinoDk || DINO_COLS.mintDk;
-  const lt = o.dinoLt || DINO_COLS.mintLt;
+  // ── 表情（expr 为唯一权威；未给 expr 时沿用旧 eyes/mouth 直传，兼容设定图）──
+  const EX = DINO_EXPR[o.expr] || DINO_EXPR.neutral;
+  const eKind = o.expr ? EX.eyes : (o.eyes || 'dot');
+  const mKind = o.expr ? EX.mouth : (o.mouth === undefined ? 'smile' : o.mouth);
+  const greyK = clamp(EX.grey || 0);
 
-  // Ground shadow under wide chubby standing feet
+  // ── 步态 / 待机（wAmp 连续混合：走 → 停不会跳变）──
+  const wAmp = o.walk == null ? 0 : clamp(o.walkAmp ?? 1);
+  const G = dinoGait(o.walk ?? 0, wAmp);
+  G.tail = lerp(0.085 * Math.sin(TAU * T / 3.1 + seed), G.tail, wAmp);          // 待机也有慢摆尾
+  G.head = lerp(dinoIdleTilt(T, seed), G.head, wAmp) + (EX.tilt || 0);
+  G.bobU = G.bob / 24;
+  const blink = o.blink != null ? clamp(o.blink) : dinoBlinkAt(T, seed);
+  const br = Math.sin(TAU * T / DINO_GAIT.BREATH + seed * 0.37) * (1 - wAmp) * (o.breath === false ? 0 : 1);
+
+  const col = greyK > 0 ? mixCol(o.dinoCol || DINO_COLS.mint, '#C9CFD7', 0.74) : (o.dinoCol || DINO_COLS.mint);
+  const dk = greyK > 0 ? mixCol(o.dinoDk || DINO_COLS.mintDk, '#AEB5BF', 0.74) : (o.dinoDk || DINO_COLS.mintDk);
+  const lt = greyK > 0 ? mixCol(o.dinoLt || DINO_COLS.mintLt, '#E4E8ED', 0.74) : (o.dinoLt || DINO_COLS.mintLt);
+
+  // Ground shadow under wide chubby standing feet（投影保留，不随身体起伏移动）
   rs('shadow');
   if (!o.noShadow) {
     const f = 1 - Math.min(0.5, Math.abs(o.dy || 0) * 0.06);
@@ -222,16 +352,30 @@ function dino(x, y, u, o = {}) {
       fill: PAL.ink, fillOp: 78, bleed: 0.2, tex: 0.3, border: 0.1, ink: null
     });
   }
+  // 每只脚一块接触阴影：跟着脚走，抬脚时变小变淡 → 走路时"脚在动"一眼可读
+  if (!o.noShadow && wAmp > 0.01) {
+    for (const s of [-1, 1]) {
+      const fp = dinoDeformPt(s * 2.0, 0.06, G);
+      const lf = clamp((s > 0 ? G.liftR : G.liftL) / DINO_GAIT.LIFT);
+      paint(ellPts(x + fp[0] * u, y + dy + fp[1] * u + G.bobU * u, u * (0.92 - 0.34 * lf), u * (0.22 - 0.09 * lf), 12), {
+        fill: PAL.ink, fillOp: 58 * (1 - 0.5 * lf), bleed: 0.25, tex: 0.3, ink: null
+      });
+    }
+  }
   if (sm > 0.05) smearTrail(x, y + dy, u, V, sm, o.smearDir ?? (o.flip ? -1 : 1), col);
 
   push();
-  translate(x, y + dy);
+  translate(x, y + dy + G.bobU * u);                       // 身体起伏（脚底在形变里被抵消）
   if (o.rot) rotate(o.rot);
-  scale((o.flip ? -1 : 1) * (o.sx ?? 1) * (1 + sq * 0.5) * (1 + sm * 0.28), (o.sy ?? 1) * (1 - sq));
+  scale((o.flip ? -1 : 1) * (o.sx ?? 1) * (1 + sq * 0.5) * (1 + sm * 0.28) * (1 + 0.010 * br),
+        (o.sy ?? 1) * (1 - sq) * (1 + 0.015 * br));        // 呼吸：整体 ±1.5% 缩放
 
-  // 1. Plump, Upturned Dino Tail attached low on the wide hip (-2.45u to -1.10u)
+  // 头部图层统一绕颈点微倾 —— 眼/嘴/腮红/凸起与头轮廓永远同一套几何
+  const headXf = fn => { push(); translate(0, -6.00 * u); rotate(G.head); translate(0, 6.00 * u); fn(); pop(); };
+
+  // 1. Plump, Upturned Dino Tail attached low on the wide hip (-2.48u to -1.02u)，滞后 0.15 相位摆动
   rs('tail');
-  const wag = Math.sin(T * 7 + (o.seed || 0)) * 0.18 * u;
+  const wag = G.tail * u;
   const tailDir = (vName === 'side' || vName === 'q' || vName === 'qback') ? -1 : 1;
   const tBaseX = tailDir * (vName === 'side' ? 3.15 : 3.65) * u;
   const tailPts = [
@@ -244,12 +388,12 @@ function dino(x, y, u, o = {}) {
   ];
   paint(tailPts, {
     wash: mixCol(col, dk, 0.14), washOp: 255, fill: dk, fillOp: 70, bleed: 0.15,
-    ink: PAL.ink, sw: sw * 0.88, curv: 0.55
+    ink: INK, sw: sw * 0.88, curv: 0.55
   });
 
-  // 2. Unified Wide Chubby Body + Short Curvy Legs + Cute Paws
+  // 2. Unified Wide Chubby Body + Short Curvy Legs + Cute Paws（腿按步态相位连续形变）
   rs('body');
-  const bodyPts = curvyStandingDinoPts(u, vName, o.walk, J);
+  const bodyPts = curvyStandingDinoPts(u, vName, G, J);
   paint(bodyPts, { wash: col, washOp: 255, ink: null });
 
   // Soft 3D watercolor highlights (wide forehead & plump side) and gentle lower-body shading
@@ -276,84 +420,83 @@ function dino(x, y, u, o = {}) {
     paint(ellPts(fCx, -3.05 * u, 3.08 * fW * u, 1.62 * u, 24, J * 0.2), {
       wash: DINO_COLS.cream, washOp: 255, ink: null
     });
-    // Soft warm crescent shadow along the bottom of the fat cream tummy
     paint(ellPts(fCx, -1.62 * u, 2.35 * fW * u, 0.34 * u, 16, J * 0.15), {
       fill: DINO_COLS.creamDk, fillOp: 120, bleed: 0.15, ink: null
     });
   }
 
-  // 4. Wide Horizontal Cream Lower-Face Patch + Kawaii Baby-Schema Face (matching ans-mascot.png!)
+  // 4. Wide Horizontal Cream Lower-Face Patch + Kawaii Baby-Schema Face（所有表情共用这一套几何）
   if (V.face) {
     const F = V.face;
-    push();
-    translate(F.cx * 0.42 * u, 0);
-    scale(F.fw, 1);
+    headXf(() => {
+      push();
+      translate(F.cx * 0.42 * u, 0);
+      scale(F.fw, 1);
 
-    // Extra-Wide Horizontal Cream Lower-Face Patch (-6.32u)
-    rs('muzzle');
-    paint(ellPts(0, -6.32 * u, 3.68 * u, 1.24 * u, 26, J * 0.18), {
-      wash: DINO_COLS.cream, washOp: 255, ink: null
-    });
-    // Subtle chin dimple curve between the wide face patch and wide round belly patch
-    paint(ellPts(0, -5.02 * u, 2.35 * u, 0.22 * u, 14, J * 0.14), {
-      fill: DINO_COLS.creamDk, fillOp: 110, bleed: 0.15, ink: null
-    });
-
-    // Soft Pink Kawaii Cheek Blushes on the wide chubby cheeks
-    rs('blush');
-    const bAmt = Math.max(0.68, o.blush === true ? 1 : (o.blush || 0));
-    for (const s of F.sides) {
-      paint(ellPts(s * 2.88 * u, -6.65 * u, 0.76 * u, 0.38 * u, 14), {
-        fill: DINO_COLS.cheek, fillOp: 175 * clamp(bAmt), bleed: 0.22, ink: null
+      rs('muzzle');
+      paint(ellPts(0, -6.32 * u, 3.68 * u, 1.24 * u, 26, J * 0.18), {
+        wash: DINO_COLS.cream, washOp: 255, ink: null
       });
-    }
+      paint(ellPts(0, -5.02 * u, 2.35 * u, 0.22 * u, 14, J * 0.14), {
+        fill: DINO_COLS.creamDk, fillOp: 110, bleed: 0.15, ink: null
+      });
 
-    // Kawaii Big Glossy Eyes sitting right at the upper border of the cream face patch (-7.45u)
-    rs('eyes');
-    const eKind = o.eyes || 'dot';
-    const dinoEyeOpt = {
-      ...o,
-      eyes: (eKind === 'normal' || eKind === 'look') ? 'dinoDot' : eKind
-    };
-    dinoEyes(u, dinoEyeOpt, sw, F.sides, sm);
+      // Soft Pink Kawaii Cheek Blushes（强度由 expr 给：石化 = 0）
+      rs('blush');
+      const bAmt = clamp(o.expr ? (EX.blush ?? 0.68) : Math.max(0.68, o.blush === true ? 1 : (o.blush || 0)));
+      if (bAmt > 0.02) for (const s of F.sides) {
+        paint(ellPts(s * 2.88 * u, -6.65 * u, 0.76 * u, 0.38 * u, 14), {
+          fill: DINO_COLS.cheek, fillOp: 175 * bAmt, bleed: 0.22, ink: null
+        });
+      }
 
-    // Cute Little Mouth centered in the upper cream face patch
-    rs('mouth');
-    push();
-    translate(F.mx * 0.45 * u, -2.02 * u);
-    const mKind = o.mouth === undefined ? 'smile' : o.mouth;
-    mouth(u * 0.84, mKind, sw * 0.92);
-    pop();
+      // Kawaii eyes: 6 kinds + 眨眼（连续 squash，不突然切换）
+      rs('eyes');
+      dinoEyes(u, { ...o, inkCol: INK, blink }, sw, F.sides, eKind);
 
-    pop();
+      // Cute Little Mouth (U 笑 / 张嘴 O / 大笑 / 波浪哭 / 一字平)
+      rs('mouth');
+      push();
+      translate(F.mx * 0.45 * u, -2.02 * u);
+      mouth(u * 0.84 * (EX.ms || 1), mKind, sw * 0.92, INK);
+      pop();
+      pop();
+
+      // 附加物（泪 / 汗 / 怒气 / 爱心）—— 跟着头一起微倾
+      rs('extras');
+      dinoExtras(u, { EX, sides: F.sides, sw, ink: INK });
+    });
   }
 
   // 5. Continuous Smooth Ink Outline (curv: 0.58)
   rs('body_ink');
-  paint(bodyPts, { ink: PAL.ink, sw: sw * 0.98, curv: 0.58 });
+  paint(bodyPts, { ink: INK, sw: sw * 0.98, curv: 0.58 });
 
   // 6. 3 Seamless Soft Rounded Mint-Green Head Bumps ON TOP of the wide head border (-9.6u to -10.55u)
-  rs('bumps');
-  const bumpShift = vName === 'side' ? -0.28 : 0;
-  const bumps = [
-    [2.38 + bumpShift, -9.58, 0.66, 0.74, 0.42],
-    [1.26 + bumpShift, -10.22, 0.92, 1.02, 0.20],
-    [-0.08 + bumpShift, -10.55, 1.22, 1.30, 0.02]
-  ];
-  for (const [bx, by, brx, bry, brot] of bumps) {
-    paint(ellPts(bx * u, by * u, brx * u, bry * u, 18, J * 0.2, brot), {
-      wash: col, washOp: 255, ink: null
-    });
-    const arcPts = arcContourPts(bx * u, by * u, brx * u, bry * u, -Math.PI * 0.94, -Math.PI * 0.06, 11, brot, J * 0.16);
-    inkLine(arcPts, sw * 0.92, PAL.ink, 'ink', 0.45);
-  }
+  headXf(() => {
+    rs('bumps');
+    const bumpShift = vName === 'side' ? -0.28 : 0;
+    const bumps = [
+      [2.38 + bumpShift, -9.58, 0.66, 0.74, 0.42],
+      [1.26 + bumpShift, -10.22, 0.92, 1.02, 0.20],
+      [-0.08 + bumpShift, -10.55, 1.22, 1.30, 0.02]
+    ];
+    for (const [bx, by, brx, bry, brot] of bumps) {
+      paint(ellPts(bx * u, by * u, brx * u, bry * u, 18, J * 0.2, brot), {
+        wash: col, washOp: 255, ink: null
+      });
+      const arcPts = arcContourPts(bx * u, by * u, brx * u, bry * u, -Math.PI * 0.94, -Math.PI * 0.06, 11, brot, J * 0.16);
+      inkLine(arcPts, sw * 0.92, INK, 'ink', 0.45);
+    }
+  });
 
-  // 7. Plump, Curvy Outward-Flipper Arms attached at the wide side of the body (x = ±4.42u, y = -4.55u)
+  // 7. Plump, Curvy Outward-Flipper Arms（手臂反相摆动，与腿的节奏同源）
   const drawDinoPaw = (px, dir, which) => {
     rs('arm' + which);
     const rawA = which === 'L' ? (o.aL ?? 0.15) : (o.aR ?? 0.15);
-    const lift = clamp((rawA - 0.15) * 1.15, -0.15, 1.85);
-    const hook = which === 'L' ? o.armL : o.armR;
+    const gaitA = which === 'L' ? G.arm : -G.arm;
+    const lift = clamp((rawA + gaitA - 0.15) * 1.15, -0.15, 1.85);
+    const hook = which === 'L' ? o.armL : (o.armR || (EX.popcorn ? dinoPopcornProp : undefined));
 
     push();
     translate(px * u, -4.55 * u);
@@ -362,7 +505,7 @@ function dino(x, y, u, o = {}) {
       rotate(ang);
       paint(ellPts(0.25 * u, 0, 0.76 * u, 0.66 * u, 14), { wash: col, washOp: 255, ink: null });
       paint(ellPts(0.95 * u, 0, 1.06 * u, 0.68 * u, 18, J * 0.2), { wash: col, washOp: 255, ink: null });
-      inkLine(arcContourPts(0.95 * u, 0, 1.06 * u, 0.68 * u, -Math.PI * 0.55, Math.PI * 0.65, 12, 0, J * 0.16), sw * 0.86, PAL.ink, 'ink', 0.45);
+      inkLine(arcContourPts(0.95 * u, 0, 1.06 * u, 0.68 * u, -Math.PI * 0.55, Math.PI * 0.65, 12, 0, J * 0.16), sw * 0.86, INK, 'ink', 0.45);
       if (hook) { translate(1.85 * u, 0); hook(u, sw); }
     } else {
       const swing = 0.72 + lift * 0.78;
@@ -381,12 +524,12 @@ function dino(x, y, u, o = {}) {
         fill: dk, fillOp: 115, bleed: 0.15, ink: null
       });
       const pawArc = arcContourPts(0, pawCy, pawRx, pawRy, -Math.PI * 0.12, Math.PI * 1.12, 14, 0, J * 0.16);
-      inkLine(pawArc, sw * 0.88, PAL.ink, 'ink', 0.42);
+      inkLine(pawArc, sw * 0.88, INK, 'ink', 0.42);
 
       if (hook) {
         translate(0, pawCy + pawRy * 0.85);
         if (dir < 0) scale(-1, 1);
-        hook(u, sw);
+        hook(u, sw, dir < 0 ? swing : -swing);
       }
     }
     pop();
@@ -419,35 +562,60 @@ function dino(x, y, u, o = {}) {
   rs('after');
 }
 
-function dinoEyes(u, o, sw, sides, smear = 0) {
-  const kinds = Array.isArray(o.eyes) ? o.eyes : o.eyes === 'wink' ? ['happy', 'dinoDot'] : [o.eyes, o.eyes];
-  const sqz = clamp(o.squint || 0);
-  const ey = -7.45 * u;
-  if (smear > 0.5 || sqz > 0.8) {
-    for (const s of sides) inkLine([[s * 2.02 * u - 0.60 * u, ey], [s * 2.02 * u + 0.60 * u, ey]], sw * 1.2, PAL.ink, 'ink', 0);
+// 眼睛 6 种（豆豆 / 弯眼笑 / 半眯无语 / 空心大眼震惊 / 螺旋 / 灰白石化）+ 哭眼。
+// 全部共用同一对锚点 (±2.02u, -7.45u) 与同一套眨眼逻辑 → 换表情时头部几何零变化。
+function dinoEyes(u, o, sw, sides, kind) {
+  const ink = o.inkCol || DINO_INK, blink = clamp(o.blink || 0);
+  const ey = -7.45 * u, sc = 1 - 0.94 * blink;
+  const lx = (o.lookX || 0) * u * 0.30, ly = (o.lookY || 0) * u * 0.24;
+  const K = kind || 'dot';
+  if (K === 'cry') {                                   // 爆哭：紧闭的 ><（泪流由 dinoExtras 画）
+    for (const s of sides) {
+      push(); translate(s * 2.02 * u, ey);
+      inkLine([[-0.62 * s * u, -0.34 * u], [0.10 * s * u, 0], [-0.62 * s * u, 0.34 * u]], sw * 1.15, ink, 'ink', 0.1);
+      pop();
+    }
     return;
   }
   for (const s of sides) {
     push();
-    translate(s * 2.02 * u, ey);
-    const k = kinds[s < 0 ? 0 : 1];
-    if (k === 'dinoDot' || k === 'wide' || k === 'shine') {
-      const blinkOn = ((T * 0.9 + (o.seed || 0) * 1.7) % 3.3) < 0.12 && k === 'dinoDot';
-      if (blinkOn) {
-        inkLine([[-0.56 * u, 0], [0.56 * u, 0]], sw * 1.1, PAL.ink, 'ink', 0);
-      } else {
-        const lx = (o.lookX || 0) * u * 0.3, ly = (o.lookY || 0) * u * 0.25;
-        const sc = (k === 'wide' || k === 'shine') ? 1.16 : 1.0;
-        paint(ellPts(lx, ly, 0.58 * sc * u, 0.62 * sc * u, 16), { wash: PAL.ink, ink: null });
-        if (u > 8) {
-          paint(ellPts(lx - 0.19 * sc * u, ly - 0.20 * sc * u, 0.21 * sc * u, 0.23 * sc * u, 8), { wash: PAL.cream, ink: null });
-          paint(ellPts(lx + 0.17 * sc * u, ly + 0.18 * sc * u, 0.10 * sc * u, 0.10 * sc * u, 8), { wash: PAL.cream, ink: null });
-        }
+    translate(s * 2.02 * u + lx, ey + ly);
+    if (K === 'dot') {                                 // 黑豆眼带高光
+      paint(ellPts(0, 0, 0.58 * u, 0.62 * u * sc, 16), { wash: ink, ink: null });
+      if (u > 8 && sc > 0.35) {
+        paint(ellPts(-0.19 * u, -0.20 * u * sc, 0.21 * u, 0.23 * u * sc, 8), { wash: PAL.cream, ink: null });
+        paint(ellPts(0.17 * u, 0.18 * u * sc, 0.10 * u, 0.10 * u, 8), { wash: PAL.cream, ink: null });
       }
-    } else {
-      eye(k, s, u * 0.78, o, sw);
+    } else if (K === 'happy') {                        // 弯眼笑：∩ 双弧
+      inkLine([[-0.66 * u, 0.20 * u], [-0.30 * u, -0.30 * u], [0.30 * u, -0.30 * u], [0.66 * u, 0.20 * u]],
+        sw * 1.2, ink, 'ink', 0.55);
+    } else if (K === 'narrow') {                       // 半眯无语：厚横缝 + 上眼睑
+      paint(ellPts(0, 0, 0.62 * u, 0.14 * u * (1 - 0.6 * blink), 14), { wash: ink, ink: null });
+      inkLine([[-0.70 * u, -0.30 * u], [0, -0.40 * u], [0.70 * u, -0.30 * u]], sw * 0.85, ink, 'ink', 0.4);
+    } else if (K === 'wide') {                         // 空心大眼震惊：白眼球 + 小瞳孔 + 高光
+      paint(ellPts(0, 0, 0.76 * u, 0.86 * u * sc, 18), { wash: PAL.cream, ink: ink, sw: sw * 0.85 });
+      paint(ellPts(0, 0.08 * u, 0.28 * u, 0.32 * u * sc, 12), { wash: ink, ink: null });
+      if (sc > 0.4) paint(ellPts(-0.11 * u, -0.10 * u * sc, 0.11 * u, 0.12 * u, 8), { wash: PAL.cream, ink: null });
+    } else if (K === 'swirl') {                        // 螺旋
+      const sp = [];
+      for (let i = 0; i < 15; i++) {
+        const a = i * 0.72 + T * 5.5 * s, r = (0.08 + i * 0.043) * u;
+        sp.push([Math.cos(a) * r, Math.sin(a) * r * sc]);
+      }
+      inkLine(sp, sw * 0.68, ink, 'inkfine', 0.55);
+    } else if (K === 'stone') {                        // 灰白石化
+      paint(ellPts(0, 0, 0.60 * u, 0.64 * u * sc, 14), { wash: '#C7CCD4', ink: ink, sw: sw * 0.7 });
+      inkLine([[0.06 * u, -0.48 * u * sc], [-0.10 * u, -0.04 * u], [0.12 * u, 0.16 * u], [0.00 * u, 0.52 * u * sc]],
+        sw * 0.5, '#8A9099', 'inkfine', 0.15);
+    } else {                                           // 旧名字直传（设定图 / creator 兼容）
+      eye(K, s, u * 0.78, o, sw);
     }
     pop();
+  }
+  if (blink > 0.5) {                                   // 闭眼线随 blink 连续淡入（不会突然出现）
+    const a = ease((blink - 0.5) / 0.5);
+    if (a > 0.04) for (const s of sides)
+      inkLine([[s * 2.02 * u - 0.62 * u, ey], [s * 2.02 * u + 0.62 * u, ey]], sw * 1.05 * a, ink, 'ink', 0);
   }
 }
 

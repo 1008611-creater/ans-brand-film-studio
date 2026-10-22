@@ -569,9 +569,8 @@
     wetHalo(1060, 855, 25, '#EFC3AE');
     creator(1060, 855, 25, myMood);
 
-    // ANS Little Dino ("小恐龙") leaps in from left with a glowing mint paintbrush-broom!
-    const dinoEnter = easeOut(seg(lt, tIn, tSweep));
-    const dinoX = lerp(240, 755, dinoEnter);
+    // ANS Little Dino ("小恐龙") 走入场，举着薄荷小扫帚（R13：走位/步态/表情全部来自 dinoPerf）
+    const D1 = dinoPerf(t);
     const dinoHop = jump(lt, tIn + beatAt(dur, .025), tSweep + beatAt(dur, .02), 2.6);
     const dinoHop2 = jump(lt, tSpark2, tSpark2 + beatAt(dur, .07), 1.9);      // 节拍③·再蹦一次
     const dinoMood = emotions(lt, [
@@ -581,9 +580,10 @@
       [tSpark2, 'starstruck'],
       [tSpark2 + beatAt(dur, .06), 'excited']
     ]);
-    wetHalo(dinoX, 855, 24, DINO_COLS.mint);
-    dino(dinoX, 855, 24, {
+    wetHalo(D1.x, 855, 24, DINO_COLS.mint);
+    dino(D1.x, 855, 24, {
       ...dinoMood,
+      expr: D1.expr, walk: D1.walk, walkAmp: D1.walkAmp, flip: D1.flip,
       view: lt < tSweep + beatAt(dur, .04) ? 'q' : 'front',
       dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy,
       sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq,
@@ -788,9 +788,11 @@
       [tCheer, 'love'],
       [tCheer + beatAt(dur, .08), 'starstruck']
     ]);
-    wetHalo(1250, 868, 22, DINO_COLS.mint);
-    dino(1250, 868, 22, {
+    const D2 = dinoPerf(t);
+    wetHalo(D2.x, 868, 22, DINO_COLS.mint);
+    dino(D2.x, 868, 22, {
       ...dinoMood,
+      expr: D2.expr, walk: D2.walk, walkAmp: D2.walkAmp,
       flip: true,
       dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy,
       sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq
@@ -983,10 +985,12 @@
     // 节拍④的星芒已在卡片之下绘制（见上），此处只保留文字层
 
     // Little Dino ("小恐龙") on left celebrating
-    wetHalo(345, 865, 23, DINO_COLS.mint);
-    dino(345, 865, 23, {
+    const D3 = dinoPerf(t);
+    wetHalo(D3.x, 865, 23, DINO_COLS.mint);
+    dino(D3.x, 865, 23, {
       ...emotions(lt, [[0, 'determined'], [tPress, 'excited'], [tPress + beatAt(dur, .06), 'happy'],
         [tCheer, 'starstruck'], [tCheer + beatAt(dur, .12), 'excited']]),
+      expr: D3.expr, walk: D3.walk, walkAmp: D3.walkAmp,
       aR: lt > tCheer - beatAt(dur, .02) && lt < tCheer + beatAt(dur, .3) ? 1.25 + 0.35 * Math.sin((lt - tCheer) * 9) : 1.25
     });
 
@@ -1103,9 +1107,13 @@
       aL: 1.10, aR: 1.10
     });
 
-    // ── 小恐龙（右，像素精灵在 2D 合成层，结构上不会被任何道具压住）──
-    wetHalo(S4.dinoX, 865, 26, DINO_COLS.mint);
-    dino(S4.dinoX, 865, 26, { flip: true, aL: 1.15, aR: 1.15 });
+    // ── 小恐龙（右，程序化绘制；R12 已定 Act4 无走位，只做五拍道具表演）──
+    const D4 = dinoPerf(t);
+    wetHalo(D4.x, 865, 26, DINO_COLS.mint);
+    dino(D4.x, 865, 26, {
+      expr: D4.expr, walk: D4.walk, walkAmp: D4.walkAmp, flip: true, aL: 1.15, aR: 1.15,
+      dy: t >= evOf('prop3').t - 2 / 24 ? jump(t, evOf('prop3').t - 1 / 24, evOf('prop3').t + 4 / 24, 2.2).dy : 0
+    });
 
     stageLayer(4, t);                           // 五个道具：礼物舱 / 算力券 / 印章 / 算力机 / 计数器
     camEnd();
@@ -1318,9 +1326,11 @@
       [tImpact, 'excited'], [tImpact + 0.50, 'starstruck'],
       [tReset, 'determined'], [tReset + 0.35, 'excited']
     ]);
-    wetHalo(1160, 865, 25, DINO_COLS.mint);
-    dino(1160, 865, 25, {
+    const D5 = dinoPerf(t);
+    wetHalo(D5.x, 865, 25, DINO_COLS.mint);
+    dino(D5.x, 865, 25, {
       ...dinoMood,
+      expr: D5.expr, walk: D5.walk, walkAmp: D5.walkAmp,
       flip: true,
       dy: (dinoMood.dy || 0) + dinoHop.dy + dinoHop2.dy + dinoHop3.dy,
       sq: (dinoMood.sq || 0) + dinoHop.sq + dinoHop2.sq + dinoHop3.sq,
@@ -1591,35 +1601,60 @@
     if (txt) letter(txt, x + dx, y + dy, size, PAL.ink, { rot: lerp(rot0, 0, k), alpha: k });
   }
 
-  // ══ 第八轮 · 像素恐龙表演状态机（每幕 ≥3 套状态 + 每幕一次 walk 走位 ≥120px）══
-  //   clip 取 assets/dino2 的 7 组：walk/idle/actions/memes/memes2/memes3/standup
-  //   帧号按素材顺序（0 基）：memes 0爆哭 1气鼓鼓 2大笑 3愣住 4无语 5吃瓜 6摆烂 7震惊 8比心
-  //   actions 0跳起 1挥手 2坐下 3躲睡 4举方块 5冲刺 6欢呼 7比心 ｜ memes2 0敬礼 … ｜ memes3 5点赞 6暗中观察 7石化 8谢谢你
-  const DACT = {
-    1: { walk: [4.12, 5.00], wx: [300, 640], ev: { pile: ['memes', 0], pile2: ['memes', 4], sweep: ['actions', 5], clean: ['idle', 6], spark: ['actions', 0], mark: ['memes', 2] } },
-    2: { walk: [7.20, 8.20], wx: [1250, 980], ev: { power: ['actions', 4], card1: ['memes', 2], card2: ['memes', 8], card3: ['memes3', 5], surge: ['actions', 6] } },
-    3: { walk: [15.30, 16.50], wx: [345, 720], ev: { lay1: ['memes3', 2], lay2: ['memes3', 1], lay3: ['actions', 4], build: ['memes3', 5], show: ['memes2', 0] } },
-    4: { walk: [0, 0], wx: [S4.dinoX, S4.dinoX], ev: { land: ['memes', 7], hatch: ['memes', 8], prop1: ['memes', 2], prop2: ['memes3', 5], prop3: ['actions', 6] } },   // R12 · Act4 无走位（五个动作节拍表演）；677 用 actions/06 欢呼帧
-    5: { walk: [36.15, 36.90], wx: [1160, 1440], ev: { cal: ['memes3', 6], stamp: ['memes3', 5], flag: ['memes2', 0], cell1: ['memes3', 7], cell4: ['memes3', 8], cell2: ['memes3', 5], cell5: ['memes3', 0], cell3: ['memes3', 6], reset: ['memes', 7], board: ['actions', 7], salute: ['memes3', 5] } }
+  // ══ R13 · 程序化小恐龙表演表（唯一权威：走位 → 步态相位 → 表情）══
+  //   步频与位移硬绑定：一个完整腿周期 = 两倍步幅 = GAIT.CYCLE_PX，走 100px ≈ 0.55s（≈182 px/s）。
+  //   相位 w = 走过的位移 / 步幅 —— 由 x(t) 直接积分得出，所以结构上不可能滑步；
+  //   走得越快相位推进越快，停下时 walk=null 回待机（walkAmp 4 帧缓入缓出，腿不会跳变）。
+  const GAIT = { CYCLE_PX: 100, RAMP: 4 / 24 };
+  // 每幕一条连续走位折线（世界 px，[时刻, x]）；段间 ease 缓入缓出，段外停在末点。
+  // 方向 = 角色朝向：向右走 flip=false，向左走 flip=true。
+  const DPATH = {
+    1: [[0.70, 240], [3.60, 755]],        // 走入场：515px / 2.90s ≈ 178 px/s
+    2: [[7.20, 1250], [7.86, 1140]],      // 向幕心走一步：110px / 0.66s ≈ 167 px/s
+    3: [[15.30, 345], [15.96, 465]],      // 向造物机走一步：120px / 0.66s ≈ 182 px/s
+    4: [[S4.dinoX, S4.dinoX]],            // R12 已定：Act4 不设走位，五个道具拍点表演
+    5: [[36.15, 1160], [36.75, 1060]]     // 向旗杆走一步：100px / 0.60s ≈ 167 px/s
   };
-  function dinoActAt(t) {
-    const act = t < SHOT_T0.s2 ? 1 : t < SHOT_T0.s3 ? 2 : t < SHOT_T0.s4 ? 3 : t < SHOT_T0.s5 ? 4 : 5;
-    const A = DACT[act];
-    for (const e of EV) {                                  // 事件定点：爆发后 4-10 帧定格
-      const pose = A.ev[e.w]; if (!pose) continue;
-      // Act4 的 EV 拍点与爆发帧差 ±0.5 帧 → 姿态对齐到爆发帧本身，保证爆发帧上已经是新姿态
-      const ft = act === 4 ? Math.round(e.t * 24) / 24 : e.t;
-      const d = t - ft, hold = (e.w === 'sweep' || e.w === 'surge' || e.w === 'show') ? 10 : 6;
-      if (d >= 0 && d < hold / 24) return { clip: pose[0], f: pose[1], dx: pose[2] || 0, scale: 1,
-        dy: (act === 4 && e.w === 'prop3') ? jump(t, ft - 1 / 24, ft + 4 / 24, 2.4).dy * 26 : 0 };
+  function dinoMove(t, act) {
+    const P = DPATH[act];
+    let x = P[0][1], walk = null, amp = 0, flip = false, moving = false;
+    for (let i = 1; i < P.length; i++) {
+      const ta = P[i - 1][0], xa = P[i - 1][1], tb = P[i][0], xb = P[i][1];
+      if (t >= tb) { x = xb; continue; }
+      if (t <= ta) { x = xa; break; }
+      x = lerp(xa, xb, ease(seg(t, ta, tb)));
+      moving = Math.abs(xb - xa) > 2;
+      if (moving) {
+        amp = Math.min(seg(t, ta, ta + GAIT.RAMP), 1 - seg(t, tb - GAIT.RAMP, tb));
+        walk = Math.abs(x - xa) / GAIT.CYCLE_PX;         // 连续相位（位移积分 / 步幅），无取整
+        flip = xb < xa;
+      }
+      break;
     }
-    if (t >= A.walk[0] && t < A.walk[1]) {                 // 走位：12fps 循环 + 位移（每幕 ≥160px）
-      const k = (t - A.walk[0]) / (A.walk[1] - A.walk[0]);
-      return { clip: 'walk', f: Math.floor((t - A.walk[0]) * 12), dx: lerp(A.wx[0], A.wx[1], k) - A.wx[0], scale: 1 };
-    }
-    return { clip: 'idle', f: Math.floor(warpT(t) * 4 + act * 3), dx: 0, scale: 1 };   // 常态 4fps 慢循环
+    return { x, walk, walkAmp: amp, flip, moving };
   }
-  setDinoAct(dinoActAt);
+  // 事件语义 → 表情（爆发帧当帧切脸，下一次事件再切）：痛点=无语/爆哭、点亮=大笑、福利=比心、
+  // Full Reset=石化、落章=欢呼、道具=吃瓜…
+  const DEXPR = {
+    pile: 'daze', pile2: 'cry', sweep: 'smug', clean: 'laugh', spark: 'shock', mark: 'heart',
+    arrive: 'happy', power: 'excited', card1: 'laugh', card2: 'heart', card3: 'smug', surge: 'laugh',
+    lay1: 'daze', lay2: 'daze', lay3: 'smug', build: 'shock', show: 'laugh',
+    land: 'shock', hatch: 'heart', prop1: 'laugh', prop2: 'popcorn', prop3: 'laugh',
+    cal: 'smug', stamp: 'shock', flag: 'heart', cell1: 'laugh', cell4: 'smug', cell2: 'laugh',
+    cell5: 'heart', cell3: 'smug', reset: 'stone', board: 'laugh', salute: 'heart', wipe: 'laugh'
+  };
+  const DEXPR_BASE = { 1: 'daze', 2: 'happy', 3: 'happy', 4: 'happy', 5: 'excited' };
+  const dinoActOf = t => t < SHOT_T0.s2 ? 1 : t < SHOT_T0.s3 ? 2 : t < SHOT_T0.s4 ? 3 : t < SHOT_T0.s5 ? 4 : 5;
+  function dinoExpr(t) {
+    let hit = null;
+    for (const e of EV) if (e.t <= t && DEXPR[e.w]) hit = e;
+    return hit ? DEXPR[hit.w] : DEXPR_BASE[dinoActOf(t)];
+  }
+  // 一次算完"位置 + 步态 + 表情"，所有 dino() 调用共用（wetHalo 也用同一个 x）
+  function dinoPerf(t) {
+    const act = dinoActOf(t), mv = dinoMove(t, act);
+    return { act, x: mv.x, walk: mv.walk, walkAmp: mv.walkAmp, flip: mv.flip, expr: dinoExpr(t) };
+  }
 
   // ══ 各幕新叙事阶段（每幕 3 段以上，新构图状态）══
   function stageLayer(act, t) {

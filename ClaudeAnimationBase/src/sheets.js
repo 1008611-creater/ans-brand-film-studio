@@ -60,4 +60,39 @@
     floor(930);
   };
   LOOPS.ans_sheet.len = 4;
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // R13 · 小恐龙程序化绑定测试台（同机位单角色 + 6 相位走路条带）
+  //   window.R13 = { expr, walk, blink, label } 由 tools/r13_stills.mjs 逐张注入
+  // ══════════════════════════════════════════════════════════════════════════════
+  const r13Halo = (x, y, u, key) => {
+    boilSeed('r13_halo_' + key);
+    paint(ellPts(x, y - 4.7 * u, 5.55 * u, 6.35 * u, 22, 2.6), {
+      wash: DINO_COLS.mint, washOp: 26, fill: DINO_COLS.mint, fillOp: 20, bleed: .62, tex: .8, border: .9, ink: null
+    });
+  };
+  LOOPS.dino_r13 = t => {
+    const C = Object.assign({ expr: 'neutral', walk: null, blink: 0, label: true }, window.R13 || {});
+    const gy = 892, u = 54;
+    // 只画一条地面墨线（不放整幅 wash：p5.brush 的大面积 wash 偶发整层丢失，会污染逐帧对比）
+    inkLine([[110, gy + 30], [W / 2, gy + 26], [W - 110, gy + 31]], 1.2, mixCol(PAL.paper, PAL.ink, .38), 'inkfine', .4);
+    r13Halo(960, gy, u, 'solo');
+    dino(960, gy, u, { expr: C.expr, walk: C.walk, blink: C.blink, seed: .5, boilKey: 'r13solo' });
+    if (C.label) label(C.expr.toUpperCase() + (C.walk == null ? ' · IDLE' : ' · WALK  w = ' + C.walk.toFixed(3)), 960, 1052, 28);
+  };
+  LOOPS.dino_r13.len = 1;
+
+  LOOPS.dino_r13_strip = t => {
+    const n = 6, u = 27, gy = 760;
+    inkLine([[90, gy + 18], [W / 2, gy + 14], [W - 90, gy + 19]], 1.4, mixCol(PAL.paper, PAL.ink, .42), 'inkfine', .4);
+    for (let i = 0; i < n; i++) {
+      const x = 168 + i * 317, w = i / n;
+      r13Halo(x, gy, u, 'strip' + i);
+      dino(x, gy, u, { expr: 'happy', walk: w, blink: 0, seed: i, boilKey: 'r13strip' + i });
+      label('w = ' + w.toFixed(3), x, gy + 54, 22);
+    }
+    label('R13 · 程序化小恐龙 · 连续步态 6 相位（一个完整腿周期 = 两倍步幅 = 100px ≈ 0.55s）', 960, 120, 30);
+  };
+  LOOPS.dino_r13_strip.len = 1;
 })();
+

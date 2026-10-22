@@ -335,7 +335,7 @@ async function setup() {
   brush.scaleBrushes(5); defineBrushes();
   paperG = makePaper(); grainC = makeGrain(); glowTex = makeGlowTex(); letG = createGraphics(W, H); letG.pixelDensity(1);
   outC = document.getElementById('out'); outX = outC.getContext('2d');
-  await preloadDino2();                              // 第八轮：像素恐龙精灵预加载完成前不出帧
+  // R13：小恐龙改回纯代码程序化绘制，不再预载任何精灵素材（assets/dino2 退役）
   await Promise.allSettled([document.fonts.load('100px "Permanent Marker"'), document.fonts.load('100px "ZCOOL KuaiLe"')]);
   window.ready = true;
   if (!location.search.includes('render')) devUI();

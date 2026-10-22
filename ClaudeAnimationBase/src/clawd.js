@@ -317,42 +317,42 @@ function eye(e, s, u, o, sw) {
 
 // ---------- mouths ----------
 // o, O, smile, grin, flat, wobble, cat, frown, smirk, laugh, open, wail, teeth, tongue, pout, yawn
-function mouth(u, m, sw) {
+function mouth(u, m, sw, ink = PAL.ink) {
   if (!m) return;
   const P = pts => pts.map(([a, b]) => [a * u, b * u]), dark = '#4A1F2A';
-  const line = (pts, w = .8, c = .6) => inkLine(P(pts), sw * w, PAL.ink, 'ink', c);
+  const line = (pts, w = .8, c = .6) => inkLine(P(pts), sw * w, ink, 'ink', c);
   switch (m) {
     case 'o': paint(ellPts(0, -4.3 * u, u * .45, u * .5, 12), { wash: PAL.ink, ink: null }); break;
-    case 'O': paint(ellPts(0, -4.1 * u, u * .8, u * .95, 14), { wash: dark, ink: PAL.ink, sw: sw * .6 }); break;
+    case 'O': paint(ellPts(0, -4.1 * u, u * .8, u * .95, 14), { wash: dark, ink, sw: sw * .6 }); break;
     case 'smile': line([[-.8, -4.6], [0, -4.1], [.8, -4.6]]); break;
     case 'frown': line([[-.8, -4.1], [0, -4.6], [.8, -4.1]]); break;
-    case 'grin': paint(P([[-1.3, -4.8], [1.3, -4.8], [.9, -3.9], [-.9, -3.9]]), { wash: dark, ink: PAL.ink, sw: sw * .6, curv: .3 }); break;
+    case 'grin': paint(P([[-1.3, -4.8], [1.3, -4.8], [.9, -3.9], [-.9, -3.9]]), { wash: dark, ink, sw: sw * .6, curv: .3 }); break;
     case 'flat': line([[-.7, -4.4], [.7, -4.4]], .8, 0); break;
     case 'wobble': line([[-1, -4.4], [-.5, -4.7], [0, -4.4], [.5, -4.7], [1, -4.4]], .7, .3); break;
     case 'cat': line([[-.9, -4.5], [-.45, -4.1], [0, -4.5], [.45, -4.1], [.9, -4.5]], .7, .5); break;
     case 'smirk': line([[-.8, -4.35], [.2, -4.3], [.9, -4.75]], .8, .5); break;
     case 'laugh':
-      paint(P([[-1.4, -4.9], [1.4, -4.9], [1, -4], [0, -3.4], [-1, -4]]), { wash: dark, ink: PAL.ink, sw: sw * .6, curv: .4 });
+      paint(P([[-1.4, -4.9], [1.4, -4.9], [1, -4], [0, -3.4], [-1, -4]]), { wash: dark, ink, sw: sw * .6, curv: .4 });
       paint(ellPts(0, -3.85 * u, .7 * u, .32 * u, 12), { wash: PAL.rose, ink: null }); break;
     case 'open':
-      paint(ellPts(0, -4.25 * u, u * .75, u * .6, 14), { wash: dark, ink: PAL.ink, sw: sw * .6 });
+      paint(ellPts(0, -4.25 * u, u * .75, u * .6, 14), { wash: dark, ink, sw: sw * .6 });
       paint(ellPts(0, -3.95 * u, u * .45, u * .2, 10), { wash: PAL.rose, ink: null }); break;
     case 'wail': {
       const w = Math.sin(T * 30) * .06;
-      paint(P([[-1.5, -4.5 + w], [-.5, -4.9], [.5, -4.9 - w], [1.5, -4.5], [1.2, -3.3], [-1.2, -3.3]]), { wash: dark, ink: PAL.ink, sw: sw * .6, curv: .3 });
+      paint(P([[-1.5, -4.5 + w], [-.5, -4.9], [.5, -4.9 - w], [1.5, -4.5], [1.2, -3.3], [-1.2, -3.3]]), { wash: dark, ink, sw: sw * .6, curv: .3 });
       paint(ellPts(0, -3.6 * u, .8 * u, .25 * u, 12), { wash: PAL.rose, ink: null }); break;
     }
     case 'teeth':
-      paint(rectPts(-1.3 * u, -4.85 * u, 2.6 * u, .95 * u, u * .04), { wash: PAL.cream, ink: PAL.ink, sw: sw * .6 });
+      paint(rectPts(-1.3 * u, -4.85 * u, 2.6 * u, .95 * u, u * .04), { wash: PAL.cream, ink, sw: sw * .6 });
       line([[-1.25, -4.38], [1.25, -4.38]], .4, 0);
       for (const tx of [-.65, 0, .65]) line([[tx, -4.8], [tx, -3.95]], .35, 0);
       break;
     case 'tongue':
-      paint(P([[.05, -4.3], [.75, -4.3], [.72, -3.75], [.4, -3.55], [.08, -3.75]]), { wash: PAL.rose, ink: PAL.ink, sw: sw * .5, curv: .5 });
+      paint(P([[.05, -4.3], [.75, -4.3], [.72, -3.75], [.4, -3.55], [.08, -3.75]]), { wash: PAL.rose, ink, sw: sw * .5, curv: .5 });
       line([[-.8, -4.6], [0, -4.2], [.8, -4.5]]); break;
     case 'pout': line([[-.45, -4.2], [0, -4.5], [.45, -4.2]], 1, .6); line([[-.25, -4.0], [0, -3.9], [.25, -4.0]], .6, .6); break;
     case 'yawn':
-      paint(ellPts(0, -4.1 * u, u * .6, u * 1.05, 14), { wash: dark, ink: PAL.ink, sw: sw * .6 });
+      paint(ellPts(0, -4.1 * u, u * .6, u * 1.05, 14), { wash: dark, ink, sw: sw * .6 });
       paint(ellPts(0, -3.45 * u, u * .38, u * .25, 10), { wash: PAL.rose, ink: null }); break;
   }
 }

@@ -21,7 +21,8 @@ const REPO = rootArg ? path.resolve(rootArg.slice(7)) : path.resolve(here, "..")
 const APP = path.join(REPO, "ClaudeAnimationBase");
 
 // ── 权威指纹（改动即告警；确认后手工更新这里）──────────────────────────
-const FROZEN_CHARS_SHA256 = "b53084c20df1b47fe7d2829fadd4d289a5bcf6bbd88267260eab07029b0bfd3e";          // src/ans_chars.js — V4.6 定稿双主角，几何冻结
+// R13 起不再对 src/ans_chars.js 做字节冻结（小恐龙已改回程序化绘制：连续步态 + 表情系统），
+// 造型权威改由 A1–A3（程序化权威 / 无精灵引用）与 DINO_GAIT 比例常量守护。
 const SPOKEN_TEXT_SHA256 = "8b3206fbee1273bb661e9b81adb1dc7521428cb0c989df9d1471e9432b9e18f4";  // 五段口播原文（= 字幕权威文本）
 const AUTHORITATIVE = {
   duration: 45.9,
@@ -38,28 +39,49 @@ const check = (id, ok, detail) => results.push({ id, ok: !!ok, detail });
 const read = (p) => fs.readFileSync(p, "utf8");
 const sha = (p) => crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
 const exists = (p) => fs.existsSync(p);
+// 取出一个 function 的完整函数体（大括号配平），用于"这个函数里不许出现什么"的断言
+const extractFn = (s, name) => {
+  const i = s.indexOf("function " + name + "(");
+  if (i < 0) return "";
+  // 参数表可能含默认值对象（o = {}），先配平括号，再从参数表之后的第一个 { 开始数函数体
+  let p = s.indexOf("(", i), pd = 0, pe = -1;
+  for (let j = p; j < s.length; j++) {
+    if (s[j] === "(") pd++;
+    else if (s[j] === ")") { pd--; if (pd === 0) { pe = j; break; } }
+  }
+  if (pe < 0) return "";
+  const b = s.indexOf("{", pe);
+  let depth = 0;
+  for (let j = b; j < s.length; j++) {
+    if (s[j] === "{") depth++;
+    else if (s[j] === "}") { depth--; if (depth === 0) return s.slice(b, j + 1); }
+  }
+  return s.slice(b);
+};
 
-// ── A. 形象权威：小恐龙 = 像素 IP 版素材（2026-10-21 取代「V4.6 程序化造型冻结」）──
-// 该决定取代旧条目「V4.6 造型字节冻结」：用户直接指令「改成这个形象吧」，
-// 小恐龙改用 assets/dino2 的 55 帧像素素材；程序化造型退役为 fallback（保留在 ans_chars.js）。
+// ── A. 形象权威：小恐龙 = 纯代码程序化绘制（R13 · 2026-10-22，取代「像素 IP 精灵」）──
+// 用户否决精灵方案（① 逐帧拼不丝滑 ② 各组素材比例/线宽不一 ③ 自动抠白有白边），
+// 明确要求"改回用代码生成，不要贴图"。于是：
+//   · dino() 是唯一绘制路径（连续步态 + expr 表情参数为权威）
+//   · 全片不得再引用 assets/dino2（素材可留在磁盘上，但代码零引用）
 const charsPath = path.join(APP, "src", "ans_chars.js");
 const chars = exists(charsPath) ? read(charsPath) : "";
-const DINO2_EXPECT = { walk: 8, idle: 8, actions: 8, memes: 9, memes2: 9, memes3: 9, standup: 4 };
-const dino2Dir = path.join(APP, "assets", "dino2");
-let dino2ok = exists(dino2Dir), dino2detail = [];
-if (dino2ok) {
-  for (const [set, n] of Object.entries(DINO2_EXPECT)) {
-    const dir = path.join(dino2Dir, set);
-    const got = exists(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".png")).length : 0;
-    if (got !== n) dino2ok = false;
-    dino2detail.push(set + ":" + got + "/" + n);
-  }
-} else dino2detail.push("缺少 assets/dino2");
-check("A1 像素 IP 恐龙素材齐备（55 帧 = walk8/idle8/actions8/memes9x3/standup4）", dino2ok, dino2detail.join(" "));
-check("A2 ans_chars.js 已接像素精灵（preloadDino2 + dinoSprite），程序化造型保留为 fallback",
-  /preloadDino2/.test(chars) && /dinoSprite/.test(chars) && /function\s+dino\s*\(/.test(chars), "preloadDino2 / dinoSprite / dino()");
-check("A3 精灵走 2D 合成层（core.js 提供 sprite()），不直接进 WEBGL 层",
-  /function\s+sprite\s*\(|sprite\s*\(/.test(read(path.join(APP, "src", "core.js"))), "core.js sprite()");
+const dinoFn = extractFn(chars, "dino");
+const gaitOk = /function\s+dinoGait\s*\(/.test(chars) && /dinoLegSwing/.test(chars)
+  && /DINO_GAIT\s*=/.test(chars) && /THIGH:\s*18\s*\*\s*Math\.PI\s*\/\s*180/.test(chars)
+  && /TAIL_LAG:\s*0\.15/.test(chars);
+const exprOk = /DINO_EXPR\s*=/.test(chars) && /o\.expr/.test(dinoFn) && /eyes:\s*'/.test(chars) && /mouth:\s*'/.test(chars);
+check("A1 程序化 dino 为权威：连续步态函数 + expr 表情参数存在",
+  gaitOk && exprOk && dinoFn.length > 0,
+  "dinoGait/dinoLegSwing/DINO_GAIT(±18°,tail lag .15) " + (gaitOk ? "OK" : "缺失") +
+  " / DINO_EXPR+o.expr " + (exprOk ? "OK" : "缺失"));
+check("A2 dino() 内不再引用 dino2 精灵（无 DINO2 / preloadDino2 / dinoSprite / sprite()）",
+  dinoFn.length > 0 && !/DINO2|preloadDino2|dinoSprite|\bsprite\s*\(/i.test(dinoFn)
+  && !/preloadDino2|dinoSprite/.test(chars) && !/["'`]assets\/dino2/.test(chars) && !/\bloadImage\s*\(/.test(chars),
+  "dino() 体 " + (dinoFn ? dinoFn.split("\n").length : 0) + " 行，零精灵引用");
+check("A3 角色不再走 sprite() 2D 精灵层（sprite() 仅作为通用原语留在 core.js）",
+  !/\bsprite\s*\(/.test(chars) && /function\s+sprite\s*\(/.test(read(path.join(APP, "src", "core.js"))),
+  "ans_chars.js 无 sprite() 调用；core.js 原语保留");
 
 // ── B. 时长一致（config / 场景 / 音频时间轴三处）─────────────────────
 const cfg = read(path.join(APP, "src", "config.js"));
@@ -113,17 +135,6 @@ check("D4 画面字幕文本 == 音频权威文本（拼接逐字相等）", pla
   `画面 ${planTexts.length} 条 / 音频 ${plan.length} 条`);
 
 // ── E. 字幕不得重叠（结构断言：只画当前子句，且只调 letter 两次）────────
-const extractFn = (s, name) => {
-  const i = s.indexOf("function " + name + "(");
-  if (i < 0) return "";
-  const b = s.indexOf("{", i);
-  let depth = 0;
-  for (let j = b; j < s.length; j++) {
-    if (s[j] === "{") depth++;
-    else if (s[j] === "}") { depth--; if (depth === 0) return s.slice(b, j + 1); }
-  }
-  return s.slice(b);
-};
 const ribbonBody = extractFn(scene, "storyRibbon");
 const textRefs = [...ribbonBody.matchAll(/([A-Za-z_$][\w$]*)\s*\.\s*text/g)].map((m) => m[1]);
 check("E1 只绘制当前子句的文本（任何帧都不可能有第二条字幕）",
